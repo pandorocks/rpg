@@ -18,11 +18,12 @@ RSpec.describe Rpg::GameOverController do
     state[:dungeon].world = world
   end
 
-  it "renders the game over screen" do
+  it "renders the game over screen with score and high scores" do
     ctrl = build_controller(described_class, app: app, screen: screen, route: route)
     response = ctrl.dispatch(:show)
 
-    expect(response).to render_text("You died!")
+    expect(response).to render_text("Final score:")
+    expect(response).to render_text("High scores")
     expect(response).to render_text("Kills:")
   end
 

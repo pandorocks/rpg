@@ -70,6 +70,7 @@ bundle exec standardrb
 - Gold economy: enemies drop gold and chests contain gold.
 - Shop screen (`$`) to buy weapons, armor, and rings that boost damage and defense.
 - Equipment persists across dungeon levels.
+- Game over summary with final score breakdown and top 5 high scores.
 - Field of view and exploration memory.
 - Help overlay and command palette.
 - Full keyboard control with a testable in-memory backend.

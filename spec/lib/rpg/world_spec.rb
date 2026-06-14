@@ -224,6 +224,29 @@ RSpec.describe Rpg::World do
     expect(world.player_damage).to eq(8)
   end
 
+  it "carries the player's progression to the next level on descend" do
+    world = described_class.new_game(width: 40, height: 20)
+    world.player.level = 7
+    world.player.max_hp = 60
+    world.player.hp = 45
+    world.player.xp = 650
+    world.player.damage = 11
+    world.entities.each { |e| e.hp = 0 }
+    stairs = world.tiles.index("stairs")
+    world.player.x = stairs % world.width
+    world.player.y = stairs / world.width
+
+    new_world = world.descend
+
+    expect(new_world).not_to be_nil
+    expect(new_world.depth).to eq(2)
+    expect(new_world.player.level).to eq(7)
+    expect(new_world.player.max_hp).to eq(60)
+    expect(new_world.player.hp).to eq(45)
+    expect(new_world.player.xp).to eq(650)
+    expect(new_world.player.damage).to eq(11)
+  end
+
   it "persists the kill count across a save/load round-trip" do
     world = small_world
     4.times { world.move_player(1, 0) if world.state == "playing" }

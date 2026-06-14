@@ -256,12 +256,14 @@ module Rpg
       new_world.messages = messages.last(20)
       new_world.add_message("You descend deeper into the dungeon...")
       new_world.cue(:descend)
-      new_world.player.gold = player.gold
-      new_world.player.weapon_id = player.weapon_id
-      new_world.player.armor_id = player.armor_id
-      new_world.player.ring_id = player.ring_id
+      # Carry the existing character (level, hp, xp, equipment, buffs, …) into the new
+      # level, repositioned at its entrance. Only the spawn point comes from the new level.
+      player.x = new_world.player.x
+      player.y = new_world.player.y
+      new_world.player = player
       new_world.inventory = inventory.dup
       new_world.restock_shop(Random.new)
+      new_world.compute_fov
       new_world
     end
 

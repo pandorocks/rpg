@@ -18,6 +18,7 @@ module Rpg
     attribute :next_id, :integer, default: 1
     attribute :kills, :integer, default: 0
     attribute :difficulty, :string, default: "Normal"
+    attribute :biome, :string, default: "dungeon"
     attribute :shop_stock, default: -> { [] }
     # Snapshot of this level's entities at generation time, used to respawn enemies when the
     # player rests at a bonfire (Phase 2). Captured by DungeonGenerator; round-trips as data.
@@ -120,6 +121,10 @@ module Rpg
 
     def equipped_armor
       Equipment.find(player.armor_id, inventory)
+    end
+
+    def equipped_ring
+      Equipment.find(player.ring_id, inventory)
     end
 
     def move_player(dx, dy)
@@ -233,28 +238,40 @@ module Rpg
 
     def pickup_item
       item = item_at(player.x, player.y)
-      if item
-        use_item(item)
-      else
+      if item.nil?
         add_message("There is nothing here to pick up.")
+        return false
       end
+
+      if item.kind == "chest"
+        open_chest(item)
+        return true
+      end
+
+      items.delete(item)
+      inventory << item unless inventory.include?(item)
+      add_message("You pick up #{item.name}.")
+      cue(:pickup)
+      compute_fov
+      true
     end
 
-    def use_item(item)
+    def use_inventory_item(item)
+      return false, "That item is not in your inventory." unless inventory.include?(item)
+
       case item.kind
       when "potion"
-        heal = 10
-        player.hp = [player.hp + heal, player.max_hp].min
-        add_message("You drink a potion and recover #{heal} HP.")
-        cue(:pickup)
+        drink_potion(item)
       when "potion_of_strength"
         player.strength_turns = 20
         add_message("You feel stronger! Melee damage is boosted for 20 turns.")
         cue(:pickup)
+        inventory.delete(item)
       when "potion_of_vision"
         player.vision_turns = 30
         add_message("Your sight sharpens! Vision range is extended for 30 turns.")
         cue(:pickup)
+        inventory.delete(item)
       when "scroll_of_mapping"
         (0...height).each do |y|
           (0...width).each do |x|
@@ -263,16 +280,28 @@ module Rpg
         end
         add_message("The scroll reveals the entire dungeon level.")
         cue(:pickup)
-      when "chest"
-        amount = [item.value, 1].max
-        player.souls += amount
-        add_message("You open a chest and find #{amount} souls.")
-        cue(:gold)
+        inventory.delete(item)
       when "weapon", "armor", "ring"
         equip_item(item)
+      else
+        return false, "You cannot use #{item.name}."
       end
-      items.delete(item)
+
       compute_fov
+      [true, nil]
+    end
+
+    def drop_item(item)
+      return false, "That item is not in your inventory." unless inventory.include?(item)
+
+      inventory.delete(item)
+      item.x = player.x
+      item.y = player.y
+      items << item
+      add_message("You drop #{item.name}.")
+      cue(:pickup)
+      compute_fov
+      true
     end
 
     def buy_item(shop_index)
@@ -281,24 +310,29 @@ module Rpg
       return nil, "You cannot afford #{item.name}." if player.souls < item.value
 
       player.souls -= item.value
-      equip_item(item)
+      inventory << item
+      equip_item(item) if item.equipment?
       shop_stock.delete_at(shop_index.to_i)
       cue(:buy)
       [item, "You buy #{item.name} for #{item.value} gold."]
     end
 
     def equip_item(item)
-      case item.kind
-      when "weapon"
-        player.weapon_id = item.id
-      when "armor"
-        player.armor_id = item.id
-      when "ring"
-        player.ring_id = item.id
-      end
+      return false, "You cannot equip #{item.name}." unless item.equipment?
+
+      set_equipment_slot(item.kind, item.id)
       inventory << item unless inventory.include?(item)
       add_message("You equip #{item.name}.")
       cue(:equip)
+      true
+    end
+
+    def unequip(item)
+      return false, "That item is not equipped." unless equipped?(item)
+
+      set_equipment_slot(item.kind, nil)
+      add_message("You unequip #{item.name}.")
+      true
     end
 
     def restock_shop(rng)
@@ -388,7 +422,7 @@ module Rpg
     def self.from_h(hash)
       hash = hash.transform_keys(&:to_sym)
       new(
-        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :kills, :difficulty, :shop_stock, :spawn_snapshot).merge(
+        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :kills, :difficulty, :biome, :shop_stock, :spawn_snapshot).merge(
           player: Player.from_h(hash[:player]),
           entities: (hash[:entities] || []).map { |e| Entity.from_h(e) },
           items: (hash[:items] || []).map { |i| Item.from_h(i) },
@@ -453,6 +487,54 @@ module Rpg
       self.state = "dead"
       add_message("You died! Press 'n' for a new game.")
       cue(:death)
+    end
+
+    def drink_potion(item)
+      heal = 10
+      before = player.hp
+      player.hp = [player.hp + heal, player.max_hp].min
+      recovered = player.hp - before
+      if recovered > 0
+        add_message("You drink a potion and recover #{recovered} HP.")
+      else
+        add_message("You drink a potion, but you are already at full health.")
+      end
+      cue(:pickup)
+      inventory.delete(item)
+    end
+
+    def open_chest(item)
+      amount = [item.value, 1].max
+      player.souls += amount
+      add_message("You open a chest and find #{amount} souls.")
+      cue(:gold)
+      items.delete(item)
+      compute_fov
+    end
+
+    def current_equipment(kind)
+      case kind
+      when "weapon" then Equipment.find(player.weapon_id, inventory)
+      when "armor" then Equipment.find(player.armor_id, inventory)
+      when "ring" then Equipment.find(player.ring_id, inventory)
+      end
+    end
+
+    def set_equipment_slot(kind, id)
+      case kind
+      when "weapon" then player.weapon_id = id
+      when "armor" then player.armor_id = id
+      when "ring" then player.ring_id = id
+      end
+    end
+
+    def equipped?(item)
+      case item.kind
+      when "weapon" then player.weapon_id == item.id
+      when "armor" then player.armor_id == item.id
+      when "ring" then player.ring_id == item.id
+      else false
+      end
     end
   end
 end

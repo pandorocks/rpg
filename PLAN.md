@@ -89,3 +89,79 @@ These multipliers are applied during dungeon generation and when awarding XP.
 
 ## Open questions
 None — ready to implement.
+
+---
+
+# Plan: More Dungeon Levels with Biome-Themed Tiles
+
+## Goal
+Make dungeon progression visually and mechanically distinct by assigning a **biome** to each depth. Biomes change the wall/floor glyphs and colors, tune the enemy mix, and persist across level transitions.
+
+## Biome progression
+
+| Depth range | Biome | Wall glyph | Floor glyph | Mood |
+|-------------|-------|------------|-------------|------|
+| 1–2 | Dungeon | 🧱 | ·· | classic stone |
+| 3–4 | Cave | 🪨 | ░░ | rough rock |
+| 5–6 | Ice Cavern | 🧊 | ❄· | frozen blue/white |
+| 7–8 | Volcano | 🌋 | ░░ | magma red/orange |
+| 9+ | Abyss | 🗿 | ▒▒ | dark purple/green |
+
+## Design decisions
+
+### 1. Tile strings stay simple
+Tiles remain `"wall"`, `"floor"`, `"stairs"`, `"bonfire"`, `"upstairs"`. The **biome** decides how they are drawn, avoiding changes to movement, combat, FOV, and serialization.
+
+### 2. New `Biome` model (`app/models/biome.rb`)
+A data module that knows:
+- `Biome.for_depth(depth)` → biome symbol.
+- `Biome.*_glyph(biome)` → wall/floor/stairs/upstairs glyphs.
+- `Biome.tile_style(tile, biome, theme)` → biome-tinted style with fallback to base style.
+- `Biome.enemy_weights(biome, depth)` and `random_enemy_kind(...)` → per-biome spawn tables.
+- `Biome.room_dimensions(biome, rng)` → per-biome room shape tweaks.
+
+### 3. World carries the biome
+- `attribute :biome, :string, default: "dungeon"` on `World`.
+- `World#to_h` / `from_h` include `biome` so cached levels remember their look.
+
+### 4. Run passes biome per level
+- `Run#generate_level` computes `Biome.for_depth(depth)` and passes it to `DungeonGenerator`.
+- Cached levels store their own biome, so ascending/descending preserves each floor's identity.
+
+### 5. MapComponent renders biome tiles
+- Wall/floor glyphs and styles resolved through `Biome`.
+- Bonfire, stairs, upstairs keep their glyphs but may pick up biome-tinted styles.
+
+### 6. DungeonGenerator uses biome for flavor
+- `Biome.room_dimensions` varies room sizes.
+- `Biome.random_enemy_kind` replaces the old single spawn table.
+- Transition messages mention the biome ("You descend into a Cave...").
+
+### 7. Theme palette additions
+Per-biome wall/floor color overrides added to the `:dungeon` theme; missing palettes fall back to base styles.
+
+### 8. UI hints
+- `StatusComponent` shows biome next to depth (`Depth: 3 (Cave)`).
+
+## Files created / modified
+
+### Created
+- `app/models/biome.rb`
+- `spec/lib/rpg/biome_spec.rb`
+
+### Modified
+- `app/models/world.rb` — `biome` attribute and serialization.
+- `app/models/dungeon_generator.rb` — biome-aware rooms and enemy spawns.
+- `app/models/run.rb` — biome computed per depth; biome transition messages.
+- `app/components/map_component.rb` — biome tile rendering.
+- `app/components/status_component.rb` — show biome name.
+- `lib/rpg/application.rb` — biome color palette overrides.
+- `spec/lib/rpg/dungeon_generator_spec.rb` — biome assertions.
+- `spec/lib/rpg/world_spec.rb` — biome round-trip.
+- `spec/lib/rpg/run_spec.rb` — biome transitions.
+- `spec/components/map_component_spec.rb` — biome-specific glyphs.
+- `README.md` / `PLAN.md` — documentation.
+
+## Testing
+- 119 RSpec examples pass.
+- `bundle exec standardrb` passes.

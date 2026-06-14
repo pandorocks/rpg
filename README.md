@@ -17,7 +17,8 @@ bundle exec exe/rpg
 | `j` / `↓` | move south |
 | `k` / `↑` | move north |
 | `l` / `→` | move east |
-| `g` | pick up item |
+| `g` | pick up item (stores in inventory) |
+| `i` | inventory: use/drop items |
 | `>` | descend stairs |
 | `f` | fire ranged shot |
 | `i` | inventory screen |
@@ -61,7 +62,7 @@ bundle exec standardrb
 
 - Procedural room-and-corridor dungeons.
 - Player movement, bump combat, and ranged fire (`f` then direction).
-- Inventory, character sheet, game over, and setup screens.
+- Inventory screen: pick up items with `g`, then use or drop them from the inventory with `i`. Equipment can be swapped without losing the old piece.
 - Avatar and difficulty selection on every new game.
 - XP, leveling up, kill count, and per-level monster scaling.
 - Goblins, orcs, and trolls that chase the player when they can see them.
@@ -75,7 +76,21 @@ bundle exec standardrb
 - Help overlay and command palette.
 - Full keyboard control with a testable in-memory backend.
 
+## Biomes
+
+Each dungeon depth has a themed biome with its own wall/floor glyphs and color palette:
+
+| Depth | Biome | Look |
+|-------|-------|------|
+| 1–2 | Dungeon | 🧱 brick walls, grey floors |
+| 3–4 | Cave | 🪨 rock walls, earthy floors |
+| 5–6 | Ice Cavern | 🧊 ice walls, frozen floors |
+| 7–8 | Volcano | 🌋 magma walls, scorched floors |
+| 9+ | Abyss | 🗿 ancient walls, dark floors |
+
+Enemy spawn tables also shift per biome, so deeper floors feel progressively more dangerous.
+
 ## Notes
 
 - The dungeon is sized to fill your terminal: each tile is two columns wide, so make the terminal window wide enough to avoid clipping (a 14-inch screen at a comfortable font size is usually plenty).
-- The status bar shows HP, XP, level, gold, depth, turn, and your current `(x,y)` coordinates.
+- The status bar shows HP, XP, level, gold, depth (with biome), turn, and your current `(x,y)` coordinates.

@@ -52,7 +52,7 @@ RSpec.describe Rpg::World do
     expect(world.messages.any? { |m| m.include?("dies") }).to be true
   end
 
-  it "picks up and uses potions" do
+  it "picks up potions into the inventory" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
       (1..3).each do |y|
@@ -67,8 +67,28 @@ RSpec.describe Rpg::World do
     world.move_player(0, 1)
     world.pickup_item
 
-    expect(world.player.hp).to eq(20)
     expect(world.items).to be_empty
+    expect(world.inventory).to contain_exactly(item)
+  end
+
+  it "drinks a potion from inventory to heal" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 10, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "potion", x: 1, y: 2)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+    world.use_inventory_item(item)
+
+    expect(world.player.hp).to eq(20)
+    expect(world.inventory).to be_empty
   end
 
   it "sets game over when the player dies" do
@@ -99,7 +119,7 @@ RSpec.describe Rpg::World do
     expect(world.messages.last).to include("darkness")
   end
 
-  it "uses a scroll of mapping to reveal the whole level" do
+  it "uses a scroll of mapping from inventory to reveal the whole level" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
       (1..3).each do |y|
@@ -113,12 +133,13 @@ RSpec.describe Rpg::World do
 
     world.move_player(0, 1)
     world.pickup_item
+    world.use_inventory_item(item)
 
     expect(world.explored.all?).to be true
     expect(world.messages.any? { |m| m.include?("reveals") }).to be true
   end
 
-  it "uses a potion of strength to boost damage" do
+  it "uses a potion of strength from inventory to boost damage" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
       (1..3).each do |y|
@@ -133,13 +154,14 @@ RSpec.describe Rpg::World do
 
     world.move_player(0, 1)
     world.pickup_item
+    world.use_inventory_item(item)
     world.move_player(1, 0)
 
     expect(enemy.hp).to eq(20 - 8)
     expect(world.messages.any? { |m| m.include?("stronger") }).to be true
   end
 
-  it "uses a potion of vision to extend sight" do
+  it "uses a potion of vision from inventory to extend sight" do
     width = 20
     height = 20
     tiles = Array.new(width * height, "floor")
@@ -151,6 +173,7 @@ RSpec.describe Rpg::World do
 
     world.move_player(0, 1)
     world.pickup_item
+    world.use_inventory_item(item)
 
     expect(world.visible.size).to be > base_visible
     expect(world.player.vision_turns).to be_positive
@@ -166,6 +189,14 @@ RSpec.describe Rpg::World do
     expect(copy.player.x).to eq(world.player.x)
     expect(copy.turn).to eq(world.turn)
     expect(copy.messages.last).to eq("hello")
+  end
+
+  it "round-trips the biome" do
+    world = Rpg::DungeonGenerator.generate(width: 40, height: 20, depth: 5, seed: 1)
+    expect(world.biome).to eq("ice")
+
+    copy = described_class.from_h(world.to_h)
+    expect(copy.biome).to eq("ice")
   end
 
   it "absorbs souls (intrinsic value + bounty) from enemies" do
@@ -220,6 +251,7 @@ RSpec.describe Rpg::World do
 
     world.move_player(0, 1)
     world.pickup_item
+    world.use_inventory_item(item)
 
     expect(world.player.weapon_id).to eq(2)
     expect(world.player_damage).to eq(8)
@@ -336,6 +368,7 @@ RSpec.describe Rpg::World do
     world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
     world.compute_fov
     world.pickup_item
+    world.use_inventory_item(item)
 
     reloaded = described_class.from_h(world.to_h)
 
@@ -390,7 +423,7 @@ RSpec.describe Rpg::World do
     expect(bought).not_to be_nil
     expect(message).to include("You buy")
     expect(world.player.souls).to eq(50)
-    expect(world.player.armor_id).to eq(99)
+    expect(world.inventory).to include(item)
     expect(world.player_defense).to eq(3)
   end
 

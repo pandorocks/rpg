@@ -16,7 +16,7 @@ module Rpg
     attribute :stats, default: -> { {} }
 
     def equipment?
-      kind.in?(%w[weapon armor ring])
+      %w[weapon armor ring].include?(kind)
     end
 
     def to_h

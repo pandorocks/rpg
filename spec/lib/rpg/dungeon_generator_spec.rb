@@ -48,6 +48,20 @@ RSpec.describe Rpg::DungeonGenerator do
     expect(deep.alive_enemies.size).to be >= shallow.alive_enemies.size
   end
 
+  it "selects a biome based on depth" do
+    dungeon = described_class.generate(width: 60, height: 20, depth: 1, seed: 1)
+    cave = described_class.generate(width: 60, height: 20, depth: 3, seed: 1)
+
+    expect(dungeon.biome).to eq("dungeon")
+    expect(cave.biome).to eq("cave")
+  end
+
+  it "accepts an explicit biome" do
+    world = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, biome: :ice)
+
+    expect(world.biome).to eq("ice")
+  end
+
   it "applies easy difficulty modifiers" do
     easy = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Easy")
     normal = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Normal")

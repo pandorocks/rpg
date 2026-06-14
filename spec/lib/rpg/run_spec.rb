@@ -52,9 +52,21 @@ RSpec.describe Rpg::Run do
     expect(world).not_to be_nil
     expect(run.current_depth).to eq(2)
     expect(world.depth).to eq(2)
+    expect(world.biome).to eq("dungeon")
     expect(world.player.level).to eq(7)
     expect(world.player.hp).to eq(45)
     expect(world.on_upstairs?).to be(true)
+  end
+
+  it "generates deeper floors with different biomes" do
+    run = fresh_run
+    stage_on(run, "stairs")
+    run.descend
+    stage_on(run, "stairs")
+    run.descend
+
+    expect(run.current_depth).to eq(3)
+    expect(run.current_world.biome).to eq("cave")
   end
 
   it "reloads a previously visited floor on ascend, keeping prior changes" do

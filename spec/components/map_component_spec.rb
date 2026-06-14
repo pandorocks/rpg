@@ -38,4 +38,16 @@ RSpec.describe Rpg::MapComponent do
 
     expect(body).to include(" ")
   end
+
+  it "renders biome-specific wall glyphs" do
+    dungeon = Rpg::DungeonGenerator.generate(width: 60, height: 20, depth: 1, seed: 1)
+    cave = Rpg::DungeonGenerator.generate(width: 60, height: 20, depth: 3, seed: 1)
+
+    dungeon_body = Charming::UI::Width.strip_ansi(component_for(dungeon).render)
+    cave_body = Charming::UI::Width.strip_ansi(component_for(cave).render)
+
+    expect(dungeon_body).to include("🧱")
+    expect(cave_body).to include("🪨")
+    expect(cave_body).not_to include("🧱")
+  end
 end

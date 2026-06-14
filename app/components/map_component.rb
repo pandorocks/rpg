@@ -3,9 +3,6 @@
 module Rpg
   class MapComponent < Charming::Component
     GLYPHS = {
-      wall: "🧱",
-      stairs: "🪜",
-      upstairs: "🔼",
       goblin: "👺",
       orc: "🐗",
       troll: "🧌",
@@ -26,7 +23,6 @@ module Rpg
       unseen: "  "
     }.freeze
 
-    FLOOR_GLYPH = "··"
     DEFAULT_PLAYER_GLYPH = "🧙"
 
     def initialize(world:, width:, height:, theme:, player_glyph: DEFAULT_PLAYER_GLYPH)
@@ -71,15 +67,23 @@ module Rpg
       item = @world.item_at(x, y)
       return [GLYPHS[item.kind.to_sym] || item.kind[0..1], @theme.item] if item
 
-      case @world.tile_at(x, y)
-      when "wall" then [GLYPHS[:wall], @theme.wall]
-      when "stairs" then [GLYPHS[:stairs], @theme.stairs]
-      when "upstairs" then [GLYPHS[:upstairs], @theme.stairs]
-      when "bonfire" then [GLYPHS[:bonfire], @theme.item]
+      tile = @world.tile_at(x, y)
+      biome = @world.biome
+
+      case tile
+      when "wall"
+        [Biome.wall_glyph(biome), Biome.tile_style(tile, biome, @theme)]
+      when "stairs"
+        [Biome.stairs_glyph(biome), @theme.stairs]
+      when "upstairs"
+        [Biome.upstairs_glyph(biome), @theme.stairs]
+      when "bonfire"
+        [GLYPHS[:bonfire], @theme.item]
       else
         visible = @world.visible?(x, y)
-        floor_style = visible ? @theme.floor : @theme.muted
-        [FLOOR_GLYPH, floor_style]
+        style = Biome.tile_style("floor", biome, @theme)
+        floor_style = visible ? style : @theme.muted
+        [Biome.floor_glyph(biome), floor_style]
       end
     end
 

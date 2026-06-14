@@ -67,7 +67,7 @@ module Rpg
       save_world(world)
       @current_depth += 1
       target = has_level?(@current_depth) ? build_world(@current_depth) : generate_and_cache(@current_depth)
-      enter(target, entrance: "upstairs", message: "You descend deeper into the dungeon...")
+      enter(target, entrance: "upstairs", direction: :descend)
     end
 
     # Move one floor up (only meaningful from depth > 1, standing on an upstairs tile). The
@@ -87,7 +87,7 @@ module Rpg
       save_world(world)
       @current_depth -= 1
       target = build_world(@current_depth)
-      enter(target, entrance: "stairs", message: "You climb back up the stairs...")
+      enter(target, entrance: "stairs", direction: :ascend)
     end
 
     # Soulslike death (respawn mode): drop the player's souls as a bloodstain on the floor where
@@ -184,15 +184,28 @@ module Rpg
     end
 
     # Reposition the player at the destination floor's entrance, announce it, persist, return.
-    def enter(world, entrance:, message:)
+    def enter(world, entrance:, direction:)
       x, y = world.find_tile(entrance) || world.find_tile("stairs") || [player.x, player.y]
       player.x = x
       player.y = y
-      world.add_message(message)
+      world.add_message(transition_message(world.biome, direction))
       world.cue(:descend)
       world.compute_fov
       save_world(world)
       world
+    end
+
+    def transition_message(biome, direction)
+      name = Biome.name(biome)
+      if direction == :descend
+        "You descend into #{article(name)} #{name}..."
+      else
+        "You climb back up into #{article(name)} #{name}..."
+      end
+    end
+
+    def article(word)
+      %w[A E I O U].include?(word[0].upcase) ? "an" : "a"
     end
 
     def build_world(depth)
@@ -212,7 +225,8 @@ module Rpg
     def generate_level(depth, seed: nil)
       world = DungeonGenerator.generate(
         width: width, height: height, depth: depth,
-        difficulty: difficulty, next_id: @next_id, seed: seed
+        difficulty: difficulty, biome: Biome.for_depth(depth),
+        next_id: @next_id, seed: seed
       )
       world.restock_shop(Random.new)
       world

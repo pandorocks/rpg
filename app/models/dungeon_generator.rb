@@ -34,7 +34,8 @@ module Rpg
       end
     end
 
-    def self.generate(width:, height:, depth:, seed: nil, difficulty: "Normal", next_id: 1)
+    def self.generate(width:, height:, depth:, seed: nil, difficulty: "Normal", biome: nil, next_id: 1)
+      biome ||= Biome.for_depth(depth)
       rng = seed ? Random.new(seed) : Random.new
       tiles = Array.new(width * height, "wall")
       rooms = []
@@ -42,8 +43,7 @@ module Rpg
       attempts = 0
 
       while rooms.size < room_count && attempts < 200
-        w = rng.rand(4..10)
-        h = rng.rand(4..8)
+        w, h = Biome.room_dimensions(biome, rng)
         x = rng.rand(1..(width - w - 2))
         y = rng.rand(1..(height - h - 2))
         candidate = Room.new(x, y, w, h)
@@ -76,7 +76,7 @@ module Rpg
 
       rooms.each_with_index do |room, index|
         next if index.zero?
-        next_id = populate_room(room, tiles, width, depth, rng, player, entities, items, next_id, difficulty)
+        next_id = populate_room(room, tiles, width, depth, biome, rng, player, entities, items, next_id, difficulty)
       end
 
       world = World.new(
@@ -89,6 +89,7 @@ module Rpg
         depth: depth,
         next_id: next_id,
         difficulty: difficulty,
+        biome: biome,
         spawn_snapshot: entities.map(&:to_h)
       )
       world.compute_fov
@@ -119,14 +120,14 @@ module Rpg
       tiles[y * width + x] = kind
     end
 
-    def self.populate_room(room, tiles, width, depth, rng, player, entities, items, next_id, difficulty)
+    def self.populate_room(room, tiles, width, depth, biome, rng, player, entities, items, next_id, difficulty)
       room.each_tile do |tx, ty|
         next unless tiles[ty * width + tx] == "floor"
         next if tx == player.x && ty == player.y
 
         roll = rng.rand
         if roll < 0.08
-          entities << spawn_enemy(next_id, tx, ty, depth, rng, difficulty)
+          entities << spawn_enemy(next_id, tx, ty, biome, depth, rng, difficulty)
           next_id += 1
         elsif roll < 0.13
           items << spawn_item(next_id, tx, ty, depth, rng)
@@ -171,8 +172,8 @@ module Rpg
       }.max_by { |_, weight| rng.rand**(1.0 / weight) }.first
     end
 
-    def self.spawn_enemy(id, x, y, depth, rng, difficulty)
-      kind = random_enemy_kind(depth, rng)
+    def self.spawn_enemy(id, x, y, biome, depth, rng, difficulty)
+      kind = Biome.random_enemy_kind(biome, depth, rng)
 
       stats = {
         goblin: {hp: 8, max_hp: 8, damage: 2, gold: 5},
@@ -194,24 +195,6 @@ module Rpg
         damage: GameBalance.apply_enemy_damage(stats[:damage], difficulty),
         gold: stats[:gold]
       )
-    end
-
-    def self.random_enemy_kind(depth, rng)
-      table = if depth > 5
-        {goblin: 0.10, orc: 0.20, troll: 0.25, zombie: 0.15, robot: 0.15, ghost: 0.10, dragon: 0.05}
-      elsif depth > 2
-        {goblin: 0.30, orc: 0.25, troll: 0.15, zombie: 0.15, robot: 0.10, ghost: 0.05, dragon: 0.0}
-      else
-        {goblin: 0.50, orc: 0.25, troll: 0.0, zombie: 0.15, robot: 0.10, ghost: 0.0, dragon: 0.0}
-      end
-
-      roll = rng.rand
-      cumulative = 0.0
-      table.each do |kind, weight|
-        cumulative += weight
-        return kind.to_s if roll < cumulative
-      end
-      table.keys.first.to_s
     end
   end
 end

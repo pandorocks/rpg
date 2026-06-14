@@ -4,13 +4,18 @@ module Rpg
   module Setup
     class ShowView < Charming::View
       def render
-        column(heading, selection_row, hint, gap: 1)
+        column(heading, selection_row, mode_line, hint, gap: 1)
       end
 
       private
 
       def heading
         text "Create your hero", style: theme.title
+      end
+
+      def mode_line
+        label = setup.hardcore ? "Hardcore (permadeath + high scores)" : "Respawn (soulslike: die, lose souls, run back)"
+        text "Mode [m to toggle]: #{label}", style: theme.text
       end
 
       def selection_row

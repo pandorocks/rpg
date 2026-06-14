@@ -4,17 +4,17 @@ require "spec_helper"
 
 RSpec.describe Rpg::Scoring do
   def world_with(**overrides)
-    player_attrs = {x: 1, y: 1, hp: 20, max_hp: 20, xp: 0, level: 1, damage: 5, gold: 0}
-    player = Rpg::Player.new(player_attrs.merge(overrides.slice(:level, :gold)))
+    player_attrs = {x: 1, y: 1, hp: 20, max_hp: 20, souls: 0, level: 1, damage: 5}
+    player = Rpg::Player.new(player_attrs.merge(overrides.slice(:level, :souls)))
     world_attrs = {width: 5, height: 5, tiles: Array.new(25, "floor"), player: player, entities: [], items: [], difficulty: "Normal"}
     Rpg::World.new(world_attrs.merge(overrides.slice(:depth, :kills, :difficulty)))
   end
 
   it "calculates a base score" do
-    world = world_with(gold: 10, kills: 3, depth: 2, level: 2)
+    world = world_with(souls: 10, kills: 3, depth: 2, level: 2)
     score = described_class.score_for(world)
 
-    expect(score[:breakdown][:gold]).to eq(20)
+    expect(score[:breakdown][:souls]).to eq(20)
     expect(score[:breakdown][:kills]).to eq(30)
     expect(score[:breakdown][:depth]).to eq(100)
     expect(score[:breakdown][:level]).to eq(25)

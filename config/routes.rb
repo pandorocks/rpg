@@ -7,4 +7,5 @@ Rpg::Application.routes do
   screen "/character", to: "character#show", title: "Character"
   screen "/game_over", to: "game_over#show", title: "Game Over"
   screen "/shop", to: "shop#show", title: "Shop"
+  screen "/bonfire", to: "bonfire#show", title: "Bonfire"
 end

@@ -34,7 +34,7 @@ module Rpg
       end
     end
 
-    def self.generate(width:, height:, depth:, seed: nil, difficulty: "Normal")
+    def self.generate(width:, height:, depth:, seed: nil, difficulty: "Normal", next_id: 1)
       rng = seed ? Random.new(seed) : Random.new
       tiles = Array.new(width * height, "wall")
       rooms = []
@@ -66,10 +66,13 @@ module Rpg
       )
 
       set_tile(tiles, width, rooms.last.center_x, rooms.last.center_y, "stairs")
+      # A bonfire sits at every floor's entrance (where the player spawns / arrives).
+      set_tile(tiles, width, start_room.center_x, start_room.center_y, "bonfire")
+      # Floors past the first get an upstairs anchor beside the bonfire so the player can backtrack.
+      set_tile(tiles, width, start_room.center_x + 1, start_room.center_y, "upstairs") if depth > 1
 
       entities = []
       items = []
-      next_id = 1
 
       rooms.each_with_index do |room, index|
         next if index.zero?
@@ -85,7 +88,8 @@ module Rpg
         items: items,
         depth: depth,
         next_id: next_id,
-        difficulty: difficulty
+        difficulty: difficulty,
+        spawn_snapshot: entities.map(&:to_h)
       )
       world.compute_fov
       world

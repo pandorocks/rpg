@@ -22,6 +22,8 @@ module Rpg
       " 🛡️ : armor",
       " 💍 : ring",
       " 💰 : chest",
+      " 🔥 : bonfire (rest)",
+      " 🩸 : bloodstain (souls)",
       " $ : open shop"
     ].freeze
 
@@ -30,10 +32,12 @@ module Rpg
       " h/j/k/l or arrows : move",
       " g : get item",
       " > : descend stairs",
+      " < : ascend stairs",
       " f : fire ranged shot",
+      " e : drink estus",
       " i : inventory",
       " c : character sheet",
-      " r : rest",
+      " r : rest / bonfire",
       " ? : toggle this help",
       " q : quit",
       " n : new game / setup"

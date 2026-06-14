@@ -93,7 +93,10 @@ SOUNDS = {
   "descend" => sequence(note(330, 0.07), note(294, 0.07), note(262, 0.07), note(196, 0.12)),
 
   # Slow descending minor sting — death.
-  "death" => sequence(note(330, 0.16), note(262, 0.16), note(196, 0.18), note(131, 0.4))
+  "death" => sequence(note(330, 0.16), note(262, 0.16), note(196, 0.18), note(131, 0.4)),
+
+  # Warm rising perfect-fifth swell — resting at a bonfire.
+  "bonfire" => sequence(note(196, 0.16, wave: :triangle), note(294, 0.18, wave: :triangle), note(392, 0.34, wave: :triangle))
 }.freeze
 
 SOUNDS.each { |name, samples| write_wav(name, samples) }

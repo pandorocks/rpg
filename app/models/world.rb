@@ -19,6 +19,9 @@ module Rpg
     attribute :kills, :integer, default: 0
     attribute :difficulty, :string, default: "Normal"
     attribute :shop_stock, default: -> { [] }
+    # Snapshot of this level's entities at generation time, used to respawn enemies when the
+    # player rests at a bonfire (Phase 2). Captured by DungeonGenerator; round-trips as data.
+    attribute :spawn_snapshot, default: -> { [] }
 
     attr_accessor :player, :entities, :items, :inventory, :visible, :sounds
 
@@ -65,12 +68,42 @@ module Rpg
       entities.find { |e| e.x == x && e.y == y && e.alive? }
     end
 
+    # A living, attackable enemy at the tile — excludes inert bloodstains (which share the
+    # entities list but must not be attacked, block movement, or gate the stairs).
+    def enemy_at(x, y)
+      entities.find { |e| e.x == x && e.y == y && e.alive? && e.kind != "bloodstain" }
+    end
+
     def item_at(x, y)
       items.find { |i| i.x == x && i.y == y }
     end
 
+    def bloodstain_at(x, y)
+      entities.find { |e| e.kind == "bloodstain" && e.x == x && e.y == y }
+    end
+
     def alive_enemies
-      entities.select(&:alive?)
+      entities.select { |e| e.alive? && e.kind != "bloodstain" }
+    end
+
+    def on_stairs?
+      tile_at(player.x, player.y) == "stairs"
+    end
+
+    def on_upstairs?
+      tile_at(player.x, player.y) == "upstairs"
+    end
+
+    def on_bonfire?
+      tile_at(player.x, player.y) == "bonfire"
+    end
+
+    # Returns the [x, y] of the first tile of the given kind, or nil if none exists.
+    def find_tile(kind)
+      index = tiles.index(kind)
+      return nil unless index
+
+      [index % width, index / width]
     end
 
     def player_damage
@@ -94,13 +127,14 @@ module Rpg
 
       tx = player.x + dx
       ty = player.y + dy
-      enemy = entity_at(tx, ty)
+      enemy = enemy_at(tx, ty)
 
       if enemy
         Combat.attack(player, enemy, self)
       elsif !solid?(tx, ty)
         player.x = tx
         player.y = ty
+        recover_bloodstain
       end
 
       advance_turn
@@ -115,6 +149,46 @@ module Rpg
       true
     end
 
+    # Full heal, refill estus, respawn this floor's enemies, and set this bonfire as the
+    # respawn anchor. The signature soulslike trade-off: safety now, a fresh fight next push.
+    def rest_at_bonfire
+      return false unless on_bonfire?
+
+      player.hp = player.max_hp
+      player.estus_charges = player.max_estus_charges
+      respawn_enemies!
+      player.respawn_depth = depth
+      player.respawn_x = player.x
+      player.respawn_y = player.y
+      add_message("You rest at the bonfire. The way ahead stirs again.")
+      cue(:bonfire)
+      true
+    end
+
+    # Drink one estus charge to recover a chunk of HP. Costs a turn. Refilled only at bonfires.
+    def quaff_estus
+      return false unless state == "playing"
+
+      if player.estus_charges.to_i <= 0
+        add_message("Your estus flask is empty.")
+        return false
+      end
+
+      heal = (player.max_hp * 0.4).ceil
+      player.hp = [player.hp + heal, player.max_hp].min
+      player.estus_charges -= 1
+      add_message("You drink estus and recover #{heal} HP.")
+      cue(:pickup)
+      advance_turn
+      true
+    end
+
+    # Restore this floor's enemies from the generation snapshot, preserving any bloodstain.
+    def respawn_enemies!
+      stains = entities.select { |e| e.kind == "bloodstain" }
+      self.entities = spawn_snapshot.map { |e| Entity.from_h(e) } + stains
+    end
+
     def fire_player(dx, dy)
       return false unless state == "playing"
 
@@ -123,7 +197,7 @@ module Rpg
       hit = false
 
       while in_bounds?(tx, ty) && !solid?(tx, ty)
-        enemy = entity_at(tx, ty)
+        enemy = enemy_at(tx, ty)
         if enemy
           Combat.shoot(player, enemy, self)
           hit = true
@@ -150,7 +224,7 @@ module Rpg
         return true
       end
 
-      return false if entity_at(tx, ty)
+      return false if enemy_at(tx, ty)
 
       entity.x = tx
       entity.y = ty
@@ -191,8 +265,8 @@ module Rpg
         cue(:pickup)
       when "chest"
         amount = [item.value, 1].max
-        player.gold += amount
-        add_message("You open a chest and find #{amount} gold.")
+        player.souls += amount
+        add_message("You open a chest and find #{amount} souls.")
         cue(:gold)
       when "weapon", "armor", "ring"
         equip_item(item)
@@ -204,9 +278,9 @@ module Rpg
     def buy_item(shop_index)
       item = shop_stock[shop_index.to_i]
       return nil, "There is nothing for sale there." unless item
-      return nil, "You cannot afford #{item.name}." if player.gold < item.value
+      return nil, "You cannot afford #{item.name}." if player.souls < item.value
 
-      player.gold -= item.value
+      player.souls -= item.value
       equip_item(item)
       shop_stock.delete_at(shop_index.to_i)
       cue(:buy)
@@ -243,29 +317,8 @@ module Rpg
       end
     end
 
-    def descend
-      return unless state == "playing"
-      return unless tile_at(player.x, player.y) == "stairs"
-
-      if alive_enemies.any?
-        add_message("Enemies block the stairs!")
-        return
-      end
-
-      new_world = DungeonGenerator.generate(width: width, height: height, depth: depth + 1, difficulty: difficulty)
-      new_world.messages = messages.last(20)
-      new_world.add_message("You descend deeper into the dungeon...")
-      new_world.cue(:descend)
-      # Carry the existing character (level, hp, xp, equipment, buffs, …) into the new
-      # level, repositioned at its entrance. Only the spawn point comes from the new level.
-      player.x = new_world.player.x
-      player.y = new_world.player.y
-      new_world.player = player
-      new_world.inventory = inventory.dup
-      new_world.restock_shop(Random.new)
-      new_world.compute_fov
-      new_world
-    end
+    # Level/run transitions (descend, ascend, level caching) are owned by Rpg::Run, which keeps
+    # the player separate from per-level state so the run's floors can persist.
 
     def compute_fov(radius: effective_vision_radius)
       self.visible = Fov.compute(self, radius: radius)
@@ -294,19 +347,26 @@ module Rpg
       messages.shift while messages.size > 100
     end
 
-    def xp_to_next_level
+    # Souls required to buy the next level. Leveling is no longer automatic — the player spends
+    # souls at a bonfire via {level_up!}.
+    def soul_cost_for_next_level
       player.level * 100
     end
 
-    def check_level_up
-      while player.xp >= xp_to_next_level
-        player.level += 1
-        player.max_hp += 5
-        player.hp = player.max_hp
-        player.damage += 1
-        add_message("You reach level #{player.level}!")
-        cue(:level_up)
-      end
+    # Spends souls to gain a level (called from the bonfire screen). Returns true on success,
+    # false when the player can't afford it.
+    def level_up!
+      cost = soul_cost_for_next_level
+      return false if player.souls < cost
+
+      player.souls -= cost
+      player.level += 1
+      player.max_hp += 5
+      player.hp = player.max_hp
+      player.damage += 1
+      add_message("You level up to level #{player.level}!")
+      cue(:level_up)
+      true
     end
 
     def to_h
@@ -319,10 +379,16 @@ module Rpg
       )
     end
 
+    # Serialized level state WITHOUT the player. Rpg::Run stores levels this way and owns the
+    # single player separately, so one character can move between persistent floors.
+    def to_level_h
+      to_h.tap { |h| h.delete(:player) }
+    end
+
     def self.from_h(hash)
       hash = hash.transform_keys(&:to_sym)
       new(
-        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :kills, :difficulty, :shop_stock).merge(
+        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :kills, :difficulty, :shop_stock, :spawn_snapshot).merge(
           player: Player.from_h(hash[:player]),
           entities: (hash[:entities] || []).map { |e| Entity.from_h(e) },
           items: (hash[:items] || []).map { |i| Item.from_h(i) },
@@ -332,7 +398,27 @@ module Rpg
       )
     end
 
+    # Rebuilds a level from a to_level_h payload, injecting the run's live player object (so
+    # mutations during play are written back to the run, not to a throwaway copy).
+    def self.from_level_h(hash, player:)
+      hash = hash.transform_keys(&:to_sym).merge(player: player.to_h)
+      world = from_h(hash)
+      world.player = player
+      world
+    end
+
     private
+
+    # When the player steps onto their dropped bloodstain, reclaim its souls and clear it.
+    def recover_bloodstain
+      stain = bloodstain_at(player.x, player.y)
+      return unless stain
+
+      player.souls += stain.souls.to_i
+      add_message("You reclaim #{stain.souls} souls from your bloodstain.")
+      entities.delete(stain)
+      cue(:gold)
+    end
 
     def stringify_keys(hash)
       hash.transform_keys(&:to_s)

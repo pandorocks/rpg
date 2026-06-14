@@ -12,7 +12,9 @@ module Rpg
     key "right", :move_east
     key "g", :pickup
     key ">", :descend
+    key "<", :ascend
     key "r", :rest
+    key "e", :estus
     key "f", :enter_fire_mode
     key "esc", :cancel_fire_mode
     key "i", :inventory
@@ -26,8 +28,6 @@ module Rpg
 
       render :show, world: world, help_open: help_open?, fire_mode: fire_mode?, player_glyph: player_glyph
     end
-
-    MOVE_COOLDOWN = 0.12
 
     def move_west
       act(-1, 0)
@@ -56,19 +56,39 @@ module Rpg
 
     def descend
       ensure_world
-      current = world
-      new_world = current.descend
-      target = new_world || current
-      save_world(target)
-      play_sounds(target)
+      result = dungeon_state.descend
+      play_sounds(result) if result
+      show
+    end
+
+    def ascend
+      ensure_world
+      result = dungeon_state.ascend
+      play_sounds(result) if result
       show
     end
 
     def rest
       ensure_world
       current = world
+      if current.on_bonfire?
+        current.rest_at_bonfire
+        save_world(current)
+        play_sounds(current)
+        return navigate_to "/bonfire"
+      end
+
       current.rest_player
       save_world(current)
+      show
+    end
+
+    def estus
+      ensure_world
+      current = world
+      current.quaff_estus
+      save_world(current)
+      play_sounds(current)
       show
     end
 
@@ -123,8 +143,6 @@ module Rpg
 
     def act(dx, dy)
       ensure_world
-      return show if throttled?
-
       current = world
       if session[:fire_mode]
         current.fire_player(dx, dy)
@@ -132,21 +150,9 @@ module Rpg
       else
         current.move_player(dx, dy)
       end
-      session[:last_move_at] = Time.now.to_f
       save_world(current)
       play_sounds(current)
       show
-    end
-
-    def throttled?
-      return false unless session[:last_move_at]
-      return false if test?
-
-      Time.now.to_f - session[:last_move_at] < MOVE_COOLDOWN
-    end
-
-    def test?
-      defined?(RSpec)
     end
 
     def dungeon_state

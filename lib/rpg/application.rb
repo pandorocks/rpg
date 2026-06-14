@@ -4,6 +4,10 @@ module Rpg
   class Application < Charming::Application
     root File.expand_path("../..", __dir__)
 
+    # Collapse held-key auto-repeat into one move per frame so the character stops the instant
+    # the key is released (no buffered-keystroke overshoot).
+    coalesce_input true
+
     theme :phosphor, built_in: "phosphor"
     theme :dungeon, extends: :phosphor, overrides: {
       wall: {foreground: "#8B7355", bold: true},

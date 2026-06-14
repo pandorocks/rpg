@@ -15,8 +15,7 @@ module Rpg
       world.add_message("#{target.name} dies!")
       world.cue(:enemy_death) if attacker.is_a?(Player)
 
-      gain_xp(attacker, target, world) if attacker.is_a?(Player)
-      gain_gold(attacker, target, world) if attacker.is_a?(Player)
+      gain_souls(attacker, target, world) if attacker.is_a?(Player)
     end
 
     def self.shoot(attacker, target, world)
@@ -32,8 +31,7 @@ module Rpg
       world.add_message("#{target.name} dies!")
       world.cue(:enemy_death) if attacker.is_a?(Player)
 
-      gain_xp(attacker, target, world) if attacker.is_a?(Player)
-      gain_gold(attacker, target, world) if attacker.is_a?(Player)
+      gain_souls(attacker, target, world) if attacker.is_a?(Player)
     end
 
     def self.damage_for(attacker, world)
@@ -56,16 +54,10 @@ module Rpg
       target.is_a?(Player)
     end
 
-    def self.gain_gold(player, target, world)
-      amount = target.gold.to_i
-      return if amount <= 0
-
-      player.gold += amount
-      world.add_message("You loot #{amount} gold.")
-    end
-
-    def self.gain_xp(player, target, world)
-      base_xp = {
+    # Souls are the single currency (merged XP + gold): earned from kills, spent at bonfires to
+    # level up and at shops to buy. The award is the enemy's intrinsic soul value plus its bounty.
+    def self.gain_souls(player, target, world)
+      base = {
         dragon: 100,
         troll: 50,
         robot: 45,
@@ -74,11 +66,10 @@ module Rpg
         goblin: 20,
         zombie: 25
       }.fetch(target.kind.to_sym, 10)
-      xp = GameBalance.apply_xp(base_xp, world.difficulty)
-      player.xp += xp
+      souls = GameBalance.apply_xp(base, world.difficulty) + target.gold.to_i
+      player.souls += souls
       world.kills += 1
-      world.add_message("You gain #{xp} XP.")
-      world.check_level_up
+      world.add_message("You absorb #{souls} souls.")
     end
   end
 end

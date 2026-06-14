@@ -12,7 +12,7 @@ RSpec.describe Rpg::ShopController do
     response = ctrl.dispatch(:show)
 
     expect(response).to render_text("Merchant")
-    expect(response).to render_text("Gold:")
+    expect(response).to render_text("Souls:")
   end
 
   it "restocks the shop when empty" do
@@ -26,7 +26,7 @@ RSpec.describe Rpg::ShopController do
     build_controller(described_class, app: app, screen: screen, route: route).dispatch(:show)
     state = app.session[:states][:dungeon]
     world = state.world
-    world.player.gold = 1000
+    world.player.souls = 1000
     state.world = world
 
     response = press(described_class, "1", app: app, screen: screen, route: route)
@@ -38,7 +38,7 @@ RSpec.describe Rpg::ShopController do
     build_controller(described_class, app: app, screen: screen, route: route).dispatch(:show)
     state = app.session[:states][:dungeon]
     world = state.world
-    world.player.gold = 0
+    world.player.souls = 0
     state.world = world
 
     response = press(described_class, "1", app: app, screen: screen, route: route)

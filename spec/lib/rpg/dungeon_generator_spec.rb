@@ -9,7 +9,7 @@ RSpec.describe Rpg::DungeonGenerator do
     expect(world.width).to eq(40)
     expect(world.height).to eq(16)
     expect(world.player.hp).to be_positive
-    expect(world.tile_at(world.player.x, world.player.y)).to eq("floor")
+    expect(world.tile_at(world.player.x, world.player.y)).to eq("bonfire")
     expect(world.alive_enemies).not_to be_empty
     expect(world.items).not_to be_empty
   end

@@ -5,6 +5,7 @@ module Rpg
     GLYPHS = {
       wall: "🧱",
       stairs: "🪜",
+      upstairs: "🔼",
       goblin: "👺",
       orc: "🐗",
       troll: "🧌",
@@ -20,6 +21,8 @@ module Rpg
       armor: "🛡️",
       ring: "💍",
       chest: "💰",
+      bonfire: "🔥",
+      bloodstain: "🩸",
       unseen: "  "
     }.freeze
 
@@ -71,6 +74,8 @@ module Rpg
       case @world.tile_at(x, y)
       when "wall" then [GLYPHS[:wall], @theme.wall]
       when "stairs" then [GLYPHS[:stairs], @theme.stairs]
+      when "upstairs" then [GLYPHS[:upstairs], @theme.stairs]
+      when "bonfire" then [GLYPHS[:bonfire], @theme.item]
       else
         visible = @world.visible?(x, y)
         floor_style = visible ? @theme.floor : @theme.muted

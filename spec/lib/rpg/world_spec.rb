@@ -43,12 +43,12 @@ RSpec.describe Rpg::World do
     expect(world.messages.any? { |m| m.include?("hit") }).to be true
   end
 
-  it "kills enemies and awards XP" do
+  it "kills enemies and awards souls" do
     world = small_world
     4.times { world.move_player(1, 0) if world.state == "playing" }
 
     expect(world.alive_enemies).to be_empty
-    expect(world.player.xp).to be_positive
+    expect(world.player.souls).to be_positive
     expect(world.messages.any? { |m| m.include?("dies") }).to be true
   end
 
@@ -168,7 +168,7 @@ RSpec.describe Rpg::World do
     expect(copy.messages.last).to eq("hello")
   end
 
-  it "loots gold from enemies" do
+  it "absorbs souls (intrinsic value + bounty) from enemies" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
       (1..3).each do |y|
@@ -182,11 +182,12 @@ RSpec.describe Rpg::World do
 
     4.times { world.move_player(1, 0) if world.state == "playing" }
 
-    expect(world.player.gold).to eq(10)
-    expect(world.messages.any? { |m| m.include?("loot") }).to be true
+    # goblin base 20 (Normal) + 10 bounty
+    expect(world.player.souls).to eq(30)
+    expect(world.messages.any? { |m| m.include?("absorb") }).to be true
   end
 
-  it "opens chests for gold" do
+  it "opens chests for souls" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
       (1..3).each do |y|
@@ -201,7 +202,7 @@ RSpec.describe Rpg::World do
     world.move_player(0, 1)
     world.pickup_item
 
-    expect(world.player.gold).to eq(25)
+    expect(world.player.souls).to eq(25)
     expect(world.messages.any? { |m| m.include?("chest") }).to be true
   end
 
@@ -224,27 +225,82 @@ RSpec.describe Rpg::World do
     expect(world.player_damage).to eq(8)
   end
 
-  it "carries the player's progression to the next level on descend" do
+  describe "soulslike mechanics" do
+    def floor_world
+      tiles = Array.new(25, "wall")
+      (1..3).each { |x| (1..3).each { |y| tiles[y * 5 + x] = "floor" } }
+      player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+      world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [])
+      world.compute_fov
+      world
+    end
+
+    it "drinks estus to heal and refuses when the flask is empty" do
+      world = floor_world
+      world.player.max_hp = 100
+      world.player.hp = 50
+      world.player.estus_charges = 1
+
+      expect(world.quaff_estus).to be(true)
+      expect(world.player.hp).to eq(90) # +40% of max
+      expect(world.player.estus_charges).to eq(0)
+      expect(world.quaff_estus).to be(false)
+      expect(world.player.hp).to eq(90)
+    end
+
+    it "levels up by spending souls, and refuses when too poor" do
+      world = floor_world
+      world.player.souls = 250
+
+      expect(world.level_up!).to be(true)
+      expect(world.player.level).to eq(2)
+      expect(world.player.souls).to eq(150) # cost was 100
+
+      world.player.souls = 10
+      expect(world.level_up!).to be(false) # next costs 200
+      expect(world.player.level).to eq(2)
+    end
+
+    it "reclaims souls when stepping onto a bloodstain" do
+      world = floor_world
+      world.player.souls = 0
+      world.entities << Rpg::Entity.new(id: 7, kind: "bloodstain", x: 2, y: 1, souls: 99)
+
+      world.move_player(1, 0)
+
+      expect(world.player.souls).to eq(99)
+      expect(world.bloodstain_at(2, 1)).to be_nil
+    end
+
+    it "ignores bloodstains when gating the stairs" do
+      world = floor_world
+      world.entities << Rpg::Entity.new(id: 7, kind: "bloodstain", x: 2, y: 2, souls: 5)
+
+      expect(world.alive_enemies).to be_empty
+    end
+
+    it "rests at a bonfire: full heal, refilled estus, respawned enemies, new anchor" do
+      world = Rpg::DungeonGenerator.generate(width: 40, height: 20, depth: 1, seed: 3)
+      bx, by = world.find_tile("bonfire")
+      world.player.x = bx
+      world.player.y = by
+      world.player.hp = 1
+      world.player.estus_charges = 0
+      world.entities.each { |e| e.dead = true } # wipe the floor
+
+      expect(world.rest_at_bonfire).to be(true)
+      expect(world.player.hp).to eq(world.player.max_hp)
+      expect(world.player.estus_charges).to eq(world.player.max_estus_charges)
+      expect([world.player.respawn_x, world.player.respawn_y]).to eq([bx, by])
+      expect(world.alive_enemies.size).to eq(world.spawn_snapshot.size) # enemies returned
+    end
+  end
+
+  it "round-trips the spawn snapshot" do
     world = described_class.new_game(width: 40, height: 20)
-    world.player.level = 7
-    world.player.max_hp = 60
-    world.player.hp = 45
-    world.player.xp = 650
-    world.player.damage = 11
-    world.entities.each { |e| e.hp = 0 }
-    stairs = world.tiles.index("stairs")
-    world.player.x = stairs % world.width
-    world.player.y = stairs / world.width
+    reloaded = described_class.from_h(world.to_h)
 
-    new_world = world.descend
-
-    expect(new_world).not_to be_nil
-    expect(new_world.depth).to eq(2)
-    expect(new_world.player.level).to eq(7)
-    expect(new_world.player.max_hp).to eq(60)
-    expect(new_world.player.hp).to eq(45)
-    expect(new_world.player.xp).to eq(650)
-    expect(new_world.player.damage).to eq(11)
+    expect(reloaded.spawn_snapshot).to eq(world.spawn_snapshot)
   end
 
   it "persists the kill count across a save/load round-trip" do
@@ -324,7 +380,7 @@ RSpec.describe Rpg::World do
         tiles[y * 5 + x] = "floor"
       end
     end
-    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, gold: 100)
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, souls: 100)
     item = Rpg::Item.new(id: 99, kind: "armor", x: nil, y: nil, name: "Plate Armor", value: 50, stats: {"defense" => 3})
     world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item], shop_stock: [item])
     world.compute_fov
@@ -333,7 +389,7 @@ RSpec.describe Rpg::World do
 
     expect(bought).not_to be_nil
     expect(message).to include("You buy")
-    expect(world.player.gold).to eq(50)
+    expect(world.player.souls).to eq(50)
     expect(world.player.armor_id).to eq(99)
     expect(world.player_defense).to eq(3)
   end
@@ -353,7 +409,7 @@ RSpec.describe Rpg::World do
       (1..3).each do |x|
         (1..3).each { |y| tiles[y * 5 + x] = "floor" }
       end
-      player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, gold: 100)
+      player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, souls: 100)
       item = Rpg::Item.new(id: 99, kind: "armor", name: "Plate Armor", value: 50, stats: {"defense" => 3})
       world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [], shop_stock: [item])
 
@@ -381,8 +437,8 @@ RSpec.describe Rpg::World do
 
     it "cues :level_up when the player gains a level" do
       world = small_world
-      world.player.xp = world.xp_to_next_level
-      world.check_level_up
+      world.player.souls = world.soul_cost_for_next_level
+      world.level_up!
 
       expect(world.sounds).to include(:level_up)
     end

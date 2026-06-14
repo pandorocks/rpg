@@ -14,7 +14,7 @@ module Rpg
       end
 
       def gold_line
-        text "Gold: #{world.player.gold}", style: theme.hud
+        text "Souls: #{world.player.souls}", style: theme.hud
       end
 
       def stock_list

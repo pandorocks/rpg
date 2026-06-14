@@ -4,7 +4,7 @@ module Rpg
   class Scoring
     def self.score_for(world)
       breakdown = {
-        gold: world.player.gold * 2,
+        souls: world.player.souls * 2,
         kills: world.kills * 10,
         depth: world.depth * 50,
         level: (world.player.level - 1) * 25

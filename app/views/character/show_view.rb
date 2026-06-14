@@ -17,10 +17,11 @@ module Rpg
         player = world.player
         lines = [
           "HP:        #{player.hp} / #{player.max_hp}",
-          "XP:        #{player.xp} / #{world.xp_to_next_level} (level #{player.level})",
+          "Level:     #{player.level} (next: #{world.soul_cost_for_next_level} souls)",
+          "Souls:     #{player.souls}",
+          "Estus:     #{player.estus_charges} / #{player.max_estus_charges}",
           "Damage:    #{world.player_damage} (base #{player.damage})",
           "Defense:   #{world.player_defense} (base #{player.defense})",
-          "Gold:      #{player.gold}",
           "Depth:     #{world.depth}",
           "Turns:     #{world.turn}",
           "Kills:     #{world.kills}",

@@ -6,6 +6,7 @@ module Rpg
     key "down", :next_emoji
     key "left", :prev_difficulty
     key "right", :next_difficulty
+    key "m", :toggle_mode
     key "enter", :confirm
     key "esc", :back
 
@@ -33,9 +34,15 @@ module Rpg
       show
     end
 
+    def toggle_mode
+      setup_state.hardcore = !setup_state.hardcore
+      show
+    end
+
     def confirm
       difficulty = GameBalance.difficulty_for(setup_state.difficulty_index).fetch(:name)
-      dungeon_state.new_game(difficulty: difficulty, width: screen.width / 2, height: screen.height - 4)
+      mode = setup_state.hardcore ? "hardcore" : "respawn"
+      dungeon_state.new_game(difficulty: difficulty, width: screen.width / 2, height: screen.height - 4, mode: mode)
       session[:player_glyph] = GameBalance.emoji_for(setup_state.emoji_index)
       navigate_to "/"
     end

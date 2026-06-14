@@ -20,7 +20,7 @@ module Rpg
       def score_box
         lines = [
           "Final score: #{score[:total]}",
-          "  Gold collected: #{score[:breakdown][:gold]} (x2)",
+          "  Souls collected:  #{score[:breakdown][:souls]} (x2)",
           "  Kills:            #{score[:breakdown][:kills]} (#{world.kills} x 10)",
           "  Depth reached:    #{score[:breakdown][:depth]} (depth #{world.depth} x 50)",
           "  Level bonus:      #{score[:breakdown][:level]} (level #{world.player.level})",
@@ -34,8 +34,7 @@ module Rpg
         player = world.player
         lines = [
           "Level:     #{player.level}",
-          "XP:        #{player.xp}",
-          "Gold:      #{player.gold}",
+          "Souls:     #{player.souls}",
           "Depth:     #{world.depth}",
           "Turns:     #{world.turn}",
           "Kills:     #{world.kills}"

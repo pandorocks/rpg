@@ -16,6 +16,8 @@ module Rpg
     attribute :damage, :integer
     attribute :dead, :boolean, default: false
     attribute :gold, :integer, default: 0
+    # Souls carried by a dropped bloodstain (kind: "bloodstain"); zero for living enemies.
+    attribute :souls, :integer, default: 0
 
     def alive?
       !dead

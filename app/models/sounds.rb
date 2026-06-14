@@ -10,6 +10,7 @@ module Rpg
     FILES = {
       death: File.join(DIR, "death.wav"),
       level_up: File.join(DIR, "level_up.wav"),
+      bonfire: File.join(DIR, "bonfire.wav"),
       enemy_death: File.join(DIR, "enemy_death.wav"),
       buy: File.join(DIR, "buy.wav"),
       descend: File.join(DIR, "descend.wav"),
@@ -20,7 +21,7 @@ module Rpg
     }.freeze
 
     # Most salient first. The winning cue for a turn is the earliest one in this list.
-    PRIORITY = %i[death level_up enemy_death buy descend pickup gold equip hit].freeze
+    PRIORITY = %i[death level_up bonfire enemy_death buy descend pickup gold equip hit].freeze
 
     # Returns the highest-priority cue present in *cues* (or nil when none). Pure, no I/O.
     def self.select(cues)

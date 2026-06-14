@@ -4,12 +4,11 @@ module Rpg
   module Dungeon
     class ShowView < Charming::View
       def render
-        return help if help_open
-
         canvas = Charming::UI::Canvas.new(screen.width, screen.height)
         canvas.place(map, top: 0, left: 0)
         canvas.place(status, top: screen.height - 4, left: 0)
         canvas.place(log, top: screen.height - 3, left: 0)
+        canvas.overlay(help) if help_open
         canvas.overlay(fire_prompt) if fire_mode
         canvas.to_s
       end

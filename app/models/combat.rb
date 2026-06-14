@@ -6,12 +6,14 @@ module Rpg
       damage = damage_for(attacker, world)
       target.hp -= damage
       world.add_message("#{attacker.name.capitalize} hit #{target.name} for #{damage} damage.")
+      world.cue(:hit)
 
       return unless target.hp <= 0
 
       target.hp = 0
       target.dead = true if target.respond_to?(:dead=)
       world.add_message("#{target.name} dies!")
+      world.cue(:enemy_death) if attacker.is_a?(Player)
 
       gain_xp(attacker, target, world) if attacker.is_a?(Player)
       gain_gold(attacker, target, world) if attacker.is_a?(Player)
@@ -21,12 +23,14 @@ module Rpg
       damage = damage_for(attacker, world)
       target.hp -= damage
       world.add_message("#{attacker.name.capitalize} shoot #{target.name} for #{damage} damage.")
+      world.cue(:hit)
 
       return unless target.hp <= 0
 
       target.hp = 0
       target.dead = true if target.respond_to?(:dead=)
       world.add_message("#{target.name} dies!")
+      world.cue(:enemy_death) if attacker.is_a?(Player)
 
       gain_xp(attacker, target, world) if attacker.is_a?(Player)
       gain_gold(attacker, target, world) if attacker.is_a?(Player)
@@ -34,13 +38,13 @@ module Rpg
 
     def self.damage_for(attacker, world)
       base = if attacker.is_a?(Player)
-        Equipment.player_damage(attacker, world.items) + strength_bonus(attacker)
+        Equipment.player_damage(attacker, world.inventory) + strength_bonus(attacker)
       else
         attacker.damage
       end
       return base unless attacker.is_a?(Entity) && target_is?(attacker, world.player)
 
-      defense = Equipment.player_defense(world.player, world.items)
+      defense = Equipment.player_defense(world.player, world.inventory)
       [base - defense, 1].max
     end
 

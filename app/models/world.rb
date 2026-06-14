@@ -20,7 +20,7 @@ module Rpg
     attribute :difficulty, :string, default: "Normal"
     attribute :shop_stock, default: -> { [] }
 
-    attr_accessor :player, :entities, :items, :inventory, :visible
+    attr_accessor :player, :entities, :items, :inventory, :visible, :sounds
 
     def self.new_game(seed: nil, difficulty: "Normal", width: 60, height: 20)
       DungeonGenerator.generate(width: width, height: height, depth: 1, seed: seed, difficulty: difficulty)
@@ -29,8 +29,16 @@ module Rpg
     def initialize(attributes = {})
       super
       self.visible = Set.new
-      self.inventory = []
+      self.inventory ||= []
+      self.sounds = []
       self.explored = Array.new(width * height, false) if explored.empty? && width && height
+    end
+
+    # Records a transient sound cue for an event that just occurred. Cues accumulate on the
+    # in-memory world and are drained by the controller after the action, before the next
+    # render re-deserializes a fresh world. They are intentionally not part of to_h/from_h.
+    def cue(name)
+      sounds << name
     end
 
     def tile_at(x, y)
@@ -164,12 +172,15 @@ module Rpg
         heal = 10
         player.hp = [player.hp + heal, player.max_hp].min
         add_message("You drink a potion and recover #{heal} HP.")
+        cue(:pickup)
       when "potion_of_strength"
         player.strength_turns = 20
         add_message("You feel stronger! Melee damage is boosted for 20 turns.")
+        cue(:pickup)
       when "potion_of_vision"
         player.vision_turns = 30
         add_message("Your sight sharpens! Vision range is extended for 30 turns.")
+        cue(:pickup)
       when "scroll_of_mapping"
         (0...height).each do |y|
           (0...width).each do |x|
@@ -177,16 +188,16 @@ module Rpg
           end
         end
         add_message("The scroll reveals the entire dungeon level.")
+        cue(:pickup)
       when "chest"
         amount = [item.value, 1].max
         player.gold += amount
         add_message("You open a chest and find #{amount} gold.")
+        cue(:gold)
       when "weapon", "armor", "ring"
         equip_item(item)
       end
-      unless %w[weapon armor ring].include?(item.kind)
-        items.delete(item)
-      end
+      items.delete(item)
       compute_fov
     end
 
@@ -198,6 +209,7 @@ module Rpg
       player.gold -= item.value
       equip_item(item)
       shop_stock.delete_at(shop_index.to_i)
+      cue(:buy)
       [item, "You buy #{item.name} for #{item.value} gold."]
     end
 
@@ -212,18 +224,22 @@ module Rpg
       end
       inventory << item unless inventory.include?(item)
       add_message("You equip #{item.name}.")
+      cue(:equip)
     end
 
     def restock_shop(rng)
       self.shop_stock = 3.times.map do
         kind = %w[weapon armor ring].sample(random: rng)
         template = Equipment.random_item(kind, rng, depth)
-        Item.new(
+        item = Item.new(
+          id: next_id,
           kind: kind,
           name: Equipment.item_name(kind, template),
           value: template[:value],
           stats: stringify_keys(template.slice(:damage, :defense))
         )
+        self.next_id += 1
+        item
       end
     end
 
@@ -239,6 +255,7 @@ module Rpg
       new_world = DungeonGenerator.generate(width: width, height: height, depth: depth + 1, difficulty: difficulty)
       new_world.messages = messages.last(20)
       new_world.add_message("You descend deeper into the dungeon...")
+      new_world.cue(:descend)
       new_world.player.gold = player.gold
       new_world.player.weapon_id = player.weapon_id
       new_world.player.armor_id = player.armor_id
@@ -286,6 +303,7 @@ module Rpg
         player.hp = player.max_hp
         player.damage += 1
         add_message("You reach level #{player.level}!")
+        cue(:level_up)
       end
     end
 
@@ -302,7 +320,7 @@ module Rpg
     def self.from_h(hash)
       hash = hash.transform_keys(&:to_sym)
       new(
-        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :difficulty, :shop_stock).merge(
+        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :kills, :difficulty, :shop_stock).merge(
           player: Player.from_h(hash[:player]),
           entities: (hash[:entities] || []).map { |e| Entity.from_h(e) },
           items: (hash[:items] || []).map { |i| Item.from_h(i) },
@@ -346,6 +364,7 @@ module Rpg
       player.hp = 0
       self.state = "dead"
       add_message("You died! Press 'n' for a new game.")
+      cue(:death)
     end
   end
 end

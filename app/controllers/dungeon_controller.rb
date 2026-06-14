@@ -50,6 +50,7 @@ module Rpg
       current = world
       current.pickup_item
       save_world(current)
+      play_sounds(current)
       show
     end
 
@@ -57,7 +58,9 @@ module Rpg
       ensure_world
       current = world
       new_world = current.descend
-      save_world(new_world || current)
+      target = new_world || current
+      save_world(target)
+      play_sounds(target)
       show
     end
 
@@ -131,6 +134,7 @@ module Rpg
       end
       session[:last_move_at] = Time.now.to_f
       save_world(current)
+      play_sounds(current)
       show
     end
 

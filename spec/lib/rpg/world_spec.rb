@@ -224,6 +224,76 @@ RSpec.describe Rpg::World do
     expect(world.player_damage).to eq(8)
   end
 
+  it "persists the kill count across a save/load round-trip" do
+    world = small_world
+    4.times { world.move_player(1, 0) if world.state == "playing" }
+    expect(world.kills).to be > 0
+
+    reloaded = described_class.from_h(world.to_h)
+
+    expect(reloaded.kills).to eq(world.kills)
+  end
+
+  it "removes equipment from the floor once picked up" do
+    tiles = Array.new(25, "wall")
+    (1..3).each { |x| (1..3).each { |y| tiles[y * 5 + x] = "floor" } }
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "weapon", x: 1, y: 2, name: "Test Sword", stats: {"damage" => 3})
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+
+    expect(world.items).not_to include(item)
+    expect(world.item_at(1, 2)).to be_nil
+  end
+
+  it "keeps equipped gear after a save/load round-trip" do
+    tiles = Array.new(25, "wall")
+    (1..3).each { |x| (1..3).each { |y| tiles[y * 5 + x] = "floor" } }
+    player = Rpg::Player.new(x: 1, y: 2, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "weapon", x: 1, y: 2, name: "Test Sword", stats: {"damage" => 3})
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+    world.pickup_item
+
+    reloaded = described_class.from_h(world.to_h)
+
+    expect(reloaded.equipped_weapon&.name).to eq("Test Sword")
+    expect(reloaded.player_damage).to eq(8)
+  end
+
+  it "restocks the shop with uniquely identified items" do
+    tiles = Array.new(25, "wall")
+    (1..3).each { |x| (1..3).each { |y| tiles[y * 5 + x] = "floor" } }
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [], next_id: 10)
+
+    world.restock_shop(Random.new(1))
+    ids = world.shop_stock.map(&:id)
+
+    expect(ids).to all(be_a(Integer))
+    expect(ids.uniq).to eq(ids)
+    expect(world.next_id).to eq(10 + world.shop_stock.size)
+  end
+
+  it "applies equipment bonuses in combat from inventory, not floor items" do
+    tiles = Array.new(25, "wall")
+    (1..3).each { |x| (1..3).each { |y| tiles[y * 5 + x] = "floor" } }
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    sword = Rpg::Item.new(id: 2, kind: "weapon", name: "Test Sword", stats: {"damage" => 3})
+    enemy = Rpg::Entity.new(id: 3, kind: "goblin", x: 2, y: 1, hp: 50, max_hp: 50, damage: 0)
+    # Weapon lives only in inventory (equipped), never on the floor (world.items is empty).
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [enemy], items: [], inventory: [sword])
+    world.player.weapon_id = 2
+    world.compute_fov
+
+    world.move_player(1, 0)
+
+    expect(enemy.hp).to eq(50 - 8) # base 5 + weapon 3
+  end
+
   it "buys equipment from the shop" do
     tiles = Array.new(25, "wall")
     (1..3).each do |x|
@@ -243,5 +313,63 @@ RSpec.describe Rpg::World do
     expect(world.player.gold).to eq(50)
     expect(world.player.armor_id).to eq(99)
     expect(world.player_defense).to eq(3)
+  end
+
+  describe "sound cues" do
+    it "cues :pickup when drinking a potion" do
+      world = small_world
+      world.player.x = 1
+      world.player.y = 3
+      world.pickup_item
+
+      expect(world.sounds).to include(:pickup)
+    end
+
+    it "cues :buy when buying from the shop" do
+      tiles = Array.new(25, "wall")
+      (1..3).each do |x|
+        (1..3).each { |y| tiles[y * 5 + x] = "floor" }
+      end
+      player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, gold: 100)
+      item = Rpg::Item.new(id: 99, kind: "armor", name: "Plate Armor", value: 50, stats: {"defense" => 3})
+      world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [], shop_stock: [item])
+
+      world.buy_item(0)
+
+      expect(world.sounds).to include(:buy)
+    end
+
+    it "cues :hit and :enemy_death when the player kills an enemy" do
+      world = small_world
+      4.times { world.move_player(1, 0) if world.state == "playing" }
+
+      expect(world.alive_enemies).to be_empty
+      expect(world.sounds).to include(:hit, :enemy_death)
+    end
+
+    it "cues :death when the player dies" do
+      world = small_world
+      world.player.hp = 0
+      world.send(:check_game_over)
+
+      expect(world.state).to eq("dead")
+      expect(world.sounds).to include(:death)
+    end
+
+    it "cues :level_up when the player gains a level" do
+      world = small_world
+      world.player.xp = world.xp_to_next_level
+      world.check_level_up
+
+      expect(world.sounds).to include(:level_up)
+    end
+
+    it "does not serialize cues across save/load" do
+      world = small_world
+      world.cue(:pickup)
+      reloaded = described_class.from_h(world.to_h)
+
+      expect(reloaded.sounds).to eq([])
+    end
   end
 end

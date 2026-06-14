@@ -56,16 +56,12 @@ module Rpg
 
     private
 
+    # Delegate to the framework's measurement so emoji (including ZWJ and
+    # variation-selector sequences such as "🛡️"/"🧙‍♂️") are counted at the same
+    # display width the bordered box uses. A local byte-count heuristic drifted
+    # on those glyphs and skewed the legend's colon column.
     def display_width(text)
-      width = 0
-      text.each_char do |char|
-        width += wide?(char) ? 2 : 1
-      end
-      width
-    end
-
-    def wide?(char)
-      char.bytesize > 3
+      Charming::UI::Width.measure(text)
     end
 
     def pad_to_width(text, target_width)

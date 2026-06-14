@@ -39,6 +39,7 @@ module Rpg
       _, message = current.buy_item(index)
       current.add_message(message)
       save_world(current)
+      play_sounds(current)
       show
     end
 

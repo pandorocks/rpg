@@ -125,7 +125,7 @@ module Rpg
           entities << spawn_enemy(next_id, tx, ty, depth, rng, difficulty)
           next_id += 1
         elsif roll < 0.13
-          items << Item.new(id: next_id, kind: random_item_kind(rng), x: tx, y: ty)
+          items << spawn_item(next_id, tx, ty, depth, rng)
           next_id += 1
         end
       end
@@ -133,12 +133,37 @@ module Rpg
       next_id
     end
 
+    def self.spawn_item(id, x, y, depth, rng)
+      kind = random_item_kind(rng)
+      if kind == "equipment"
+        eq_kind = %w[weapon armor ring].sample(random: rng)
+        template = Equipment.random_item(eq_kind, rng, depth)
+        Item.new(
+          id: id,
+          kind: eq_kind,
+          x: x,
+          y: y,
+          name: Equipment.item_name(eq_kind, template),
+          value: template[:value],
+          stats: stringify_keys(template.slice(:damage, :defense))
+        )
+      else
+        Item.new(id: id, kind: kind, x: x, y: y)
+      end
+    end
+
+    def self.stringify_keys(hash)
+      hash.transform_keys(&:to_s)
+    end
+
     def self.random_item_kind(rng)
       {
-        "potion" => 0.40,
-        "potion_of_strength" => 0.20,
-        "potion_of_vision" => 0.20,
-        "scroll_of_mapping" => 0.20
+        "potion" => 0.30,
+        "potion_of_strength" => 0.10,
+        "potion_of_vision" => 0.10,
+        "scroll_of_mapping" => 0.10,
+        "chest" => 0.15,
+        "equipment" => 0.25
       }.max_by { |_, weight| rng.rand**(1.0 / weight) }.first
     end
 
@@ -146,13 +171,13 @@ module Rpg
       kind = random_enemy_kind(depth, rng)
 
       stats = {
-        goblin: {hp: 8, max_hp: 8, damage: 2},
-        orc: {hp: 12, max_hp: 12, damage: 3},
-        troll: {hp: 20, max_hp: 20, damage: 5},
-        zombie: {hp: 18, max_hp: 18, damage: 2},
-        robot: {hp: 22, max_hp: 22, damage: 4},
-        ghost: {hp: 14, max_hp: 14, damage: 4},
-        dragon: {hp: 45, max_hp: 45, damage: 9}
+        goblin: {hp: 8, max_hp: 8, damage: 2, gold: 5},
+        orc: {hp: 12, max_hp: 12, damage: 3, gold: 10},
+        troll: {hp: 20, max_hp: 20, damage: 5, gold: 20},
+        zombie: {hp: 18, max_hp: 18, damage: 2, gold: 8},
+        robot: {hp: 22, max_hp: 22, damage: 4, gold: 18},
+        ghost: {hp: 14, max_hp: 14, damage: 4, gold: 15},
+        dragon: {hp: 45, max_hp: 45, damage: 9, gold: 75}
       }[kind.to_sym]
 
       Entity.new(
@@ -162,7 +187,8 @@ module Rpg
         y: y,
         hp: GameBalance.apply_enemy_hp(stats[:hp], difficulty),
         max_hp: GameBalance.apply_enemy_hp(stats[:max_hp], difficulty),
-        damage: GameBalance.apply_enemy_damage(stats[:damage], difficulty)
+        damage: GameBalance.apply_enemy_damage(stats[:damage], difficulty),
+        gold: stats[:gold]
       )
     end
 

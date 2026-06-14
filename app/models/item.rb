@@ -11,6 +11,13 @@ module Rpg
     attribute :kind, :string
     attribute :x, :integer
     attribute :y, :integer
+    attribute :name, :string
+    attribute :value, :integer, default: 0
+    attribute :stats, default: -> { {} }
+
+    def equipment?
+      kind.in?(%w[weapon armor ring])
+    end
 
     def to_h
       attributes.symbolize_keys

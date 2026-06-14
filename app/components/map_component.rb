@@ -14,8 +14,12 @@ module Rpg
       dragon: "🐲",
       potion: "🧪",
       potion_of_strength: "💪",
-      potion_of_vision: "👁️",
-      scroll_of_mapping: "🗺️",
+      potion_of_vision: "🔦",
+      scroll_of_mapping: "📜",
+      weapon: "⚔️",
+      armor: "🛡️",
+      ring: "💍",
+      chest: "💰",
       unseen: "  "
     }.freeze
 

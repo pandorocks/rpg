@@ -18,14 +18,18 @@ module Rpg
         lines = [
           "HP:        #{player.hp} / #{player.max_hp}",
           "XP:        #{player.xp} / #{world.xp_to_next_level} (level #{player.level})",
-          "Damage:    #{player.damage}",
+          "Damage:    #{world.player_damage} (base #{player.damage})",
+          "Defense:   #{world.player_defense} (base #{player.defense})",
+          "Gold:      #{player.gold}",
           "Depth:     #{world.depth}",
           "Turns:     #{world.turn}",
           "Kills:     #{world.kills}",
           "State:     #{world.state}"
         ]
+        lines << "Weapon:    #{world.equipped_weapon&.name || "none"}"
+        lines << "Armor:     #{world.equipped_armor&.name || "none"}"
         content = lines.join("\n")
-        theme.text.border(:rounded).width(40).padding(1).render(content)
+        theme.text.border(:rounded).width(44).padding(1).render(content)
       end
     end
   end

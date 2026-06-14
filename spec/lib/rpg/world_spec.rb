@@ -167,4 +167,81 @@ RSpec.describe Rpg::World do
     expect(copy.turn).to eq(world.turn)
     expect(copy.messages.last).to eq("hello")
   end
+
+  it "loots gold from enemies" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    enemy = Rpg::Entity.new(id: 1, kind: "goblin", x: 3, y: 1, hp: 6, max_hp: 6, damage: 2, gold: 10)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [enemy], items: [])
+    world.compute_fov
+
+    4.times { world.move_player(1, 0) if world.state == "playing" }
+
+    expect(world.player.gold).to eq(10)
+    expect(world.messages.any? { |m| m.include?("loot") }).to be true
+  end
+
+  it "opens chests for gold" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "chest", x: 1, y: 2, value: 25)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+
+    expect(world.player.gold).to eq(25)
+    expect(world.messages.any? { |m| m.include?("chest") }).to be true
+  end
+
+  it "equips weapons from the ground" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "weapon", x: 1, y: 2, name: "Test Sword", stats: {"damage" => 3})
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+
+    expect(world.player.weapon_id).to eq(2)
+    expect(world.player_damage).to eq(8)
+  end
+
+  it "buys equipment from the shop" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5, gold: 100)
+    item = Rpg::Item.new(id: 99, kind: "armor", x: nil, y: nil, name: "Plate Armor", value: 50, stats: {"defense" => 3})
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item], shop_stock: [item])
+    world.compute_fov
+
+    bought, message = world.buy_item(0)
+
+    expect(bought).not_to be_nil
+    expect(message).to include("You buy")
+    expect(world.player.gold).to eq(50)
+    expect(world.player.armor_id).to eq(99)
+    expect(world.player_defense).to eq(3)
+  end
 end

@@ -14,6 +14,7 @@ module Rpg
       world.add_message("#{target.name} dies!")
 
       gain_xp(attacker, target, world) if attacker.is_a?(Player)
+      gain_gold(attacker, target, world) if attacker.is_a?(Player)
     end
 
     def self.shoot(attacker, target, world)
@@ -28,13 +29,35 @@ module Rpg
       world.add_message("#{target.name} dies!")
 
       gain_xp(attacker, target, world) if attacker.is_a?(Player)
+      gain_gold(attacker, target, world) if attacker.is_a?(Player)
     end
 
     def self.damage_for(attacker, world)
-      base = attacker.damage
-      return base unless attacker.is_a?(Player) && attacker.strength_turns.to_i > 0
+      base = if attacker.is_a?(Player)
+        Equipment.player_damage(attacker, world.items) + strength_bonus(attacker)
+      else
+        attacker.damage
+      end
+      return base unless attacker.is_a?(Entity) && target_is?(attacker, world.player)
 
-      base + 3
+      defense = Equipment.player_defense(world.player, world.items)
+      [base - defense, 1].max
+    end
+
+    def self.strength_bonus(player)
+      (player.strength_turns.to_i > 0) ? 3 : 0
+    end
+
+    def self.target_is?(attacker, target)
+      target.is_a?(Player)
+    end
+
+    def self.gain_gold(player, target, world)
+      amount = target.gold.to_i
+      return if amount <= 0
+
+      player.gold += amount
+      world.add_message("You loot #{amount} gold.")
     end
 
     def self.gain_xp(player, target, world)

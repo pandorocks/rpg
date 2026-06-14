@@ -14,8 +14,13 @@ module Rpg
     attribute :xp, :integer, default: 0
     attribute :level, :integer, default: 1
     attribute :damage, :integer
+    attribute :defense, :integer, default: 0
+    attribute :gold, :integer, default: 0
     attribute :vision_turns, :integer, default: 0
     attribute :strength_turns, :integer, default: 0
+    attribute :weapon_id, :integer
+    attribute :armor_id, :integer
+    attribute :ring_id, :integer
 
     def alive?
       hp > 0

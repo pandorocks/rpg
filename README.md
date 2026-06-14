@@ -22,6 +22,7 @@ bundle exec exe/rpg
 | `f` | fire ranged shot |
 | `i` | inventory screen |
 | `c` | character sheet |
+| `$` | shop |
 | `r` | rest a turn |
 | `?` | toggle help overlay |
 | `ctrl+p` | command palette |
@@ -65,7 +66,10 @@ bundle exec standardrb
 - XP, leveling up, kill count, and per-level monster scaling.
 - Goblins, orcs, and trolls that chase the player when they can see them.
 - Potions, stairs, and a message log.
-- Multiple item types: healing potions, potions of strength, potions of vision, and scrolls of mapping.
+- Multiple item types: healing potions, potions of strength, potions of vision, scrolls of mapping, chests, weapons, armor, and rings.
+- Gold economy: enemies drop gold and chests contain gold.
+- Shop screen (`$`) to buy weapons, armor, and rings that boost damage and defense.
+- Equipment persists across dungeon levels.
 - Field of view and exploration memory.
 - Help overlay and command palette.
 - Full keyboard control with a testable in-memory backend.
@@ -73,4 +77,4 @@ bundle exec standardrb
 ## Notes
 
 - The dungeon is sized to fill your terminal: each tile is two columns wide, so make the terminal window wide enough to avoid clipping (a 14-inch screen at a comfortable font size is usually plenty).
-- The status bar shows HP, XP, level, depth, turn, and your current `(x,y)` coordinates.
+- The status bar shows HP, XP, level, gold, depth, turn, and your current `(x,y)` coordinates.

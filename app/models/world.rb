@@ -18,8 +18,9 @@ module Rpg
     attribute :next_id, :integer, default: 1
     attribute :kills, :integer, default: 0
     attribute :difficulty, :string, default: "Normal"
+    attribute :shop_stock, default: -> { [] }
 
-    attr_accessor :player, :entities, :items, :visible
+    attr_accessor :player, :entities, :items, :inventory, :visible
 
     def self.new_game(seed: nil, difficulty: "Normal", width: 60, height: 20)
       DungeonGenerator.generate(width: width, height: height, depth: 1, seed: seed, difficulty: difficulty)
@@ -28,6 +29,7 @@ module Rpg
     def initialize(attributes = {})
       super
       self.visible = Set.new
+      self.inventory = []
       self.explored = Array.new(width * height, false) if explored.empty? && width && height
     end
 
@@ -61,6 +63,22 @@ module Rpg
 
     def alive_enemies
       entities.select(&:alive?)
+    end
+
+    def player_damage
+      Equipment.player_damage(player, inventory)
+    end
+
+    def player_defense
+      Equipment.player_defense(player, inventory)
+    end
+
+    def equipped_weapon
+      Equipment.find(player.weapon_id, inventory)
+    end
+
+    def equipped_armor
+      Equipment.find(player.armor_id, inventory)
     end
 
     def move_player(dx, dy)
@@ -159,9 +177,54 @@ module Rpg
           end
         end
         add_message("The scroll reveals the entire dungeon level.")
+      when "chest"
+        amount = [item.value, 1].max
+        player.gold += amount
+        add_message("You open a chest and find #{amount} gold.")
+      when "weapon", "armor", "ring"
+        equip_item(item)
       end
-      items.delete(item)
+      unless %w[weapon armor ring].include?(item.kind)
+        items.delete(item)
+      end
       compute_fov
+    end
+
+    def buy_item(shop_index)
+      item = shop_stock[shop_index.to_i]
+      return nil, "There is nothing for sale there." unless item
+      return nil, "You cannot afford #{item.name}." if player.gold < item.value
+
+      player.gold -= item.value
+      equip_item(item)
+      shop_stock.delete_at(shop_index.to_i)
+      [item, "You buy #{item.name} for #{item.value} gold."]
+    end
+
+    def equip_item(item)
+      case item.kind
+      when "weapon"
+        player.weapon_id = item.id
+      when "armor"
+        player.armor_id = item.id
+      when "ring"
+        player.ring_id = item.id
+      end
+      inventory << item unless inventory.include?(item)
+      add_message("You equip #{item.name}.")
+    end
+
+    def restock_shop(rng)
+      self.shop_stock = 3.times.map do
+        kind = %w[weapon armor ring].sample(random: rng)
+        template = Equipment.random_item(kind, rng, depth)
+        Item.new(
+          kind: kind,
+          name: Equipment.item_name(kind, template),
+          value: template[:value],
+          stats: stringify_keys(template.slice(:damage, :defense))
+        )
+      end
     end
 
     def descend
@@ -176,6 +239,12 @@ module Rpg
       new_world = DungeonGenerator.generate(width: width, height: height, depth: depth + 1, difficulty: difficulty)
       new_world.messages = messages.last(20)
       new_world.add_message("You descend deeper into the dungeon...")
+      new_world.player.gold = player.gold
+      new_world.player.weapon_id = player.weapon_id
+      new_world.player.armor_id = player.armor_id
+      new_world.player.ring_id = player.ring_id
+      new_world.inventory = inventory.dup
+      new_world.restock_shop(Random.new)
       new_world
     end
 
@@ -224,22 +293,30 @@ module Rpg
       attributes.symbolize_keys.merge(
         player: player.to_h,
         entities: entities.map(&:to_h),
-        items: items.map(&:to_h)
+        items: items.map(&:to_h),
+        inventory: inventory.map(&:to_h),
+        shop_stock: shop_stock.map(&:to_h)
       )
     end
 
     def self.from_h(hash)
       hash = hash.transform_keys(&:to_sym)
       new(
-        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :difficulty).merge(
+        hash.slice(:width, :height, :tiles, :explored, :messages, :turn, :depth, :state, :next_id, :difficulty, :shop_stock).merge(
           player: Player.from_h(hash[:player]),
           entities: (hash[:entities] || []).map { |e| Entity.from_h(e) },
-          items: (hash[:items] || []).map { |i| Item.from_h(i) }
+          items: (hash[:items] || []).map { |i| Item.from_h(i) },
+          inventory: (hash[:inventory] || []).map { |i| Item.from_h(i) },
+          shop_stock: (hash[:shop_stock] || []).map { |i| Item.from_h(i) }
         )
       )
     end
 
     private
+
+    def stringify_keys(hash)
+      hash.transform_keys(&:to_s)
+    end
 
     def advance_turn
       self.turn += 1

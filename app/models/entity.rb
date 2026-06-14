@@ -15,6 +15,7 @@ module Rpg
     attribute :max_hp, :integer
     attribute :damage, :integer
     attribute :dead, :boolean, default: false
+    attribute :gold, :integer, default: 0
 
     def alive?
       !dead

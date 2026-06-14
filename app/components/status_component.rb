@@ -9,7 +9,7 @@ module Rpg
     end
 
     def render
-      left = "HP: #{@world.player.hp}/#{@world.player.max_hp}  XP: #{@world.player.xp}  Lvl: #{@world.player.level}"
+      left = "HP: #{@world.player.hp}/#{@world.player.max_hp}  XP: #{@world.player.xp}  Lvl: #{@world.player.level}  Gold: #{@world.player.gold}"
       right = "Depth: #{@world.depth}  Turn: #{@world.turn}  Pos: (#{@world.player.x},#{@world.player.y})"
       pad = [@width - left.length - right.length, 1].max
       text = left + (" " * pad) + right

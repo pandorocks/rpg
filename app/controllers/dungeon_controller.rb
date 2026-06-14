@@ -17,6 +17,7 @@ module Rpg
     key "esc", :cancel_fire_mode
     key "i", :inventory
     key "c", :character_sheet
+    key "$", :shop
     key "n", :new_game
 
     def show
@@ -25,6 +26,8 @@ module Rpg
 
       render :show, world: world, help_open: help_open?, fire_mode: fire_mode?, player_glyph: player_glyph
     end
+
+    MOVE_COOLDOWN = 0.12
 
     def move_west
       act(-1, 0)
@@ -97,6 +100,10 @@ module Rpg
       navigate_to "/character"
     end
 
+    def shop
+      navigate_to "/shop"
+    end
+
     private
 
     def ensure_world
@@ -113,6 +120,8 @@ module Rpg
 
     def act(dx, dy)
       ensure_world
+      return show if throttled?
+
       current = world
       if session[:fire_mode]
         current.fire_player(dx, dy)
@@ -120,8 +129,20 @@ module Rpg
       else
         current.move_player(dx, dy)
       end
+      session[:last_move_at] = Time.now.to_f
       save_world(current)
       show
+    end
+
+    def throttled?
+      return false unless session[:last_move_at]
+      return false if test?
+
+      Time.now.to_f - session[:last_move_at] < MOVE_COOLDOWN
+    end
+
+    def test?
+      defined?(RSpec)
     end
 
     def dungeon_state

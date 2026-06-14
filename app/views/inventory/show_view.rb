@@ -18,22 +18,23 @@ module Rpg
         return text "No items are visible nearby.", style: theme.muted if visible_items.empty?
 
         rows = visible_items.map do |item|
-          text "- #{item_name(item.kind)} at (#{item.x}, #{item.y})", style: theme.text
+          text "- #{item_name(item)} at (#{item.x}, #{item.y})", style: theme.text
         end
         column(*rows)
       end
 
       def hint
-        text "Items are consumed automatically when you press g on them. Press esc or i to return.", style: theme.muted
+        text "Items are consumed or equipped automatically when you press g on them. Press esc or i to return.", style: theme.muted
       end
 
-      def item_name(kind)
+      def item_name(item)
         {
           "potion" => "potion of healing",
           "potion_of_strength" => "potion of strength",
           "potion_of_vision" => "potion of vision",
-          "scroll_of_mapping" => "scroll of mapping"
-        }.fetch(kind, kind)
+          "scroll_of_mapping" => "scroll of mapping",
+          "chest" => "chest (#{item.value}g)"
+        }.fetch(item.kind, item.name)
       end
     end
   end

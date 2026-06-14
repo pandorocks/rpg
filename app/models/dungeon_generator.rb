@@ -34,7 +34,7 @@ module Rpg
       end
     end
 
-    def self.generate(width:, height:, depth:, seed: nil)
+    def self.generate(width:, height:, depth:, seed: nil, difficulty: "Normal")
       rng = seed ? Random.new(seed) : Random.new
       tiles = Array.new(width * height, "wall")
       rooms = []
@@ -60,9 +60,9 @@ module Rpg
       player = Player.new(
         x: start_room.center_x,
         y: start_room.center_y,
-        hp: 30,
-        max_hp: 30,
-        damage: 5
+        hp: GameBalance.apply_player_hp(30, difficulty),
+        max_hp: GameBalance.apply_player_hp(30, difficulty),
+        damage: GameBalance.apply_player_damage(5, difficulty)
       )
 
       set_tile(tiles, width, rooms.last.center_x, rooms.last.center_y, "stairs")
@@ -73,7 +73,7 @@ module Rpg
 
       rooms.each_with_index do |room, index|
         next if index.zero?
-        next_id = populate_room(room, tiles, width, depth, rng, player, entities, items, next_id)
+        next_id = populate_room(room, tiles, width, depth, rng, player, entities, items, next_id, difficulty)
       end
 
       world = World.new(
@@ -84,7 +84,8 @@ module Rpg
         entities: entities,
         items: items,
         depth: depth,
-        next_id: next_id
+        next_id: next_id,
+        difficulty: difficulty
       )
       world.compute_fov
       world
@@ -114,17 +115,17 @@ module Rpg
       tiles[y * width + x] = kind
     end
 
-    def self.populate_room(room, tiles, width, depth, rng, player, entities, items, next_id)
+    def self.populate_room(room, tiles, width, depth, rng, player, entities, items, next_id, difficulty)
       room.each_tile do |tx, ty|
         next unless tiles[ty * width + tx] == "floor"
         next if tx == player.x && ty == player.y
 
         roll = rng.rand
         if roll < 0.08
-          entities << spawn_enemy(next_id, tx, ty, depth, rng)
+          entities << spawn_enemy(next_id, tx, ty, depth, rng, difficulty)
           next_id += 1
         elsif roll < 0.13
-          items << Item.new(id: next_id, kind: "potion", x: tx, y: ty)
+          items << Item.new(id: next_id, kind: random_item_kind(rng), x: tx, y: ty)
           next_id += 1
         end
       end
@@ -132,29 +133,55 @@ module Rpg
       next_id
     end
 
-    def self.spawn_enemy(id, x, y, depth, rng)
-      table = if depth > 2
-        {goblin: 0.5, orc: 0.35, troll: 0.15}
-      else
-        {goblin: 0.8, orc: 0.2, troll: 0.0}
-      end
+    def self.random_item_kind(rng)
+      {
+        "potion" => 0.40,
+        "potion_of_strength" => 0.20,
+        "potion_of_vision" => 0.20,
+        "scroll_of_mapping" => 0.20
+      }.max_by { |_, weight| rng.rand**(1.0 / weight) }.first
+    end
 
-      roll = rng.rand
-      kind = if roll < table[:goblin]
-        "goblin"
-      elsif roll < table[:goblin] + table[:orc]
-        "orc"
-      else
-        "troll"
-      end
+    def self.spawn_enemy(id, x, y, depth, rng, difficulty)
+      kind = random_enemy_kind(depth, rng)
 
       stats = {
         goblin: {hp: 8, max_hp: 8, damage: 2},
         orc: {hp: 12, max_hp: 12, damage: 3},
-        troll: {hp: 20, max_hp: 20, damage: 5}
+        troll: {hp: 20, max_hp: 20, damage: 5},
+        zombie: {hp: 18, max_hp: 18, damage: 2},
+        robot: {hp: 22, max_hp: 22, damage: 4},
+        ghost: {hp: 14, max_hp: 14, damage: 4},
+        dragon: {hp: 45, max_hp: 45, damage: 9}
       }[kind.to_sym]
 
-      Entity.new(id: id, kind: kind, x: x, y: y, **stats)
+      Entity.new(
+        id: id,
+        kind: kind,
+        x: x,
+        y: y,
+        hp: GameBalance.apply_enemy_hp(stats[:hp], difficulty),
+        max_hp: GameBalance.apply_enemy_hp(stats[:max_hp], difficulty),
+        damage: GameBalance.apply_enemy_damage(stats[:damage], difficulty)
+      )
+    end
+
+    def self.random_enemy_kind(depth, rng)
+      table = if depth > 5
+        {goblin: 0.10, orc: 0.20, troll: 0.25, zombie: 0.15, robot: 0.15, ghost: 0.10, dragon: 0.05}
+      elsif depth > 2
+        {goblin: 0.30, orc: 0.25, troll: 0.15, zombie: 0.15, robot: 0.10, ghost: 0.05, dragon: 0.0}
+      else
+        {goblin: 0.50, orc: 0.25, troll: 0.0, zombie: 0.15, robot: 0.10, ghost: 0.0, dragon: 0.0}
+      end
+
+      roll = rng.rand
+      cumulative = 0.0
+      table.each do |kind, weight|
+        cumulative += weight
+        return kind.to_s if roll < cumulative
+      end
+      table.keys.first.to_s
     end
   end
 end

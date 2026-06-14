@@ -9,8 +9,15 @@ module Rpg
     key "?", :toggle_help, scope: :global
 
     command "New game" do
-      state(:dungeon, DungeonState).new_game
-      navigate_to "/"
+      navigate_to "/setup"
+    end
+
+    command "Inventory" do
+      navigate_to "/inventory"
+    end
+
+    command "Character" do
+      navigate_to "/character"
     end
 
     command "Quit" do

@@ -16,8 +16,8 @@ module Rpg
       self.world_json = JSON.generate(world.to_h)
     end
 
-    def new_game
-      self.world = World.new_game
+    def new_game(difficulty: "Normal", width: 60, height: 20)
+      self.world = World.new_game(difficulty: difficulty, width: width, height: height)
     end
   end
 end

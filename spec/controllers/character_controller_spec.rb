@@ -1,0 +1,29 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+
+RSpec.describe Rpg::CharacterController do
+  let(:app) { Rpg::Application.new }
+  let(:screen) { Charming::Screen.new(width: 80, height: 24) }
+  let(:route) { Rpg::Application.routes.resolve("/character") }
+
+  it "renders the character sheet" do
+    ctrl = build_controller(described_class, app: app, screen: screen, route: route)
+    response = ctrl.dispatch(:show)
+
+    expect(response).to render_text("Character Sheet")
+    expect(response).to render_text("HP:")
+  end
+
+  it "returns to the dungeon on esc" do
+    response = press(described_class, "esc", app: app, screen: screen, route: route)
+
+    expect(response).to be_navigate
+  end
+
+  it "returns to the dungeon on c" do
+    response = press(described_class, "c", app: app, screen: screen, route: route)
+
+    expect(response).to be_navigate
+  end
+end

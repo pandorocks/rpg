@@ -11,7 +11,7 @@ RSpec.describe "RPG runtime" do
 
     expect(backend.frames.size).to be >= 4
     help_frame = Charming::UI::Width.strip_ansi(backend.frames[3].to_s)
-    expect(help_frame).to include("HP:")
     expect(help_frame).to include("Controls:")
+    expect(help_frame).to include("n : new game / setup")
   end
 end

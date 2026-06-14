@@ -99,6 +99,63 @@ RSpec.describe Rpg::World do
     expect(world.messages.last).to include("darkness")
   end
 
+  it "uses a scroll of mapping to reveal the whole level" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "scroll_of_mapping", x: 1, y: 2)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+
+    expect(world.explored.all?).to be true
+    expect(world.messages.any? { |m| m.include?("reveals") }).to be true
+  end
+
+  it "uses a potion of strength to boost damage" do
+    tiles = Array.new(25, "wall")
+    (1..3).each do |x|
+      (1..3).each do |y|
+        tiles[y * 5 + x] = "floor"
+      end
+    end
+    player = Rpg::Player.new(x: 1, y: 1, hp: 20, max_hp: 20, damage: 5)
+    enemy = Rpg::Entity.new(id: 1, kind: "goblin", x: 3, y: 1, hp: 20, max_hp: 20, damage: 2)
+    item = Rpg::Item.new(id: 2, kind: "potion_of_strength", x: 1, y: 2)
+    world = described_class.new(width: 5, height: 5, tiles: tiles, player: player, entities: [enemy], items: [item])
+    world.compute_fov
+
+    world.move_player(0, 1)
+    world.pickup_item
+    world.move_player(1, 0)
+
+    expect(enemy.hp).to eq(20 - 8)
+    expect(world.messages.any? { |m| m.include?("stronger") }).to be true
+  end
+
+  it "uses a potion of vision to extend sight" do
+    width = 20
+    height = 20
+    tiles = Array.new(width * height, "floor")
+    player = Rpg::Player.new(x: 10, y: 10, hp: 20, max_hp: 20, damage: 5)
+    item = Rpg::Item.new(id: 2, kind: "potion_of_vision", x: 10, y: 11)
+    world = described_class.new(width: width, height: height, tiles: tiles, player: player, entities: [], items: [item])
+    world.compute_fov
+    base_visible = world.visible.size
+
+    world.move_player(0, 1)
+    world.pickup_item
+
+    expect(world.visible.size).to be > base_visible
+    expect(world.player.vision_turns).to be_positive
+  end
+
   it "serializes and deserializes round-trip" do
     world = small_world
     world.move_player(1, 0)

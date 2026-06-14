@@ -15,10 +15,12 @@ module Rpg
         " g : get item",
         " > : descend stairs",
         " f : fire ranged shot",
+        " i : inventory",
+        " c : character sheet",
         " r : rest",
         " ? : toggle this help",
         " q : quit",
-        " n : new game (after death)"
+        " n : new game / setup"
       ]
       max_len = lines.map(&:length).max
       box_width = [max_len + 4, @width - 4].min

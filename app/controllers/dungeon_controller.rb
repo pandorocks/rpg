@@ -15,11 +15,15 @@ module Rpg
     key "r", :rest
     key "f", :enter_fire_mode
     key "esc", :cancel_fire_mode
+    key "i", :inventory
+    key "c", :character_sheet
     key "n", :new_game
 
     def show
       ensure_world
-      render :show, world: world, help_open: help_open?, fire_mode: fire_mode?
+      return navigate_to "/game_over" if world.state == "dead"
+
+      render :show, world: world, help_open: help_open?, fire_mode: fire_mode?, player_glyph: player_glyph
     end
 
     def move_west
@@ -63,8 +67,7 @@ module Rpg
     end
 
     def new_game
-      dungeon_state.new_game
-      show
+      navigate_to "/setup"
     end
 
     def enter_fire_mode
@@ -86,10 +89,18 @@ module Rpg
       show
     end
 
+    def inventory
+      navigate_to "/inventory"
+    end
+
+    def character_sheet
+      navigate_to "/character"
+    end
+
     private
 
     def ensure_world
-      dungeon_state.new_game unless dungeon_state.world
+      dungeon_state.new_game(difficulty: "Normal", width: screen.width / 2, height: screen.height - 4) unless dungeon_state.world
     end
 
     def world
@@ -123,6 +134,10 @@ module Rpg
 
     def fire_mode?
       !!session[:fire_mode]
+    end
+
+    def player_glyph
+      session[:player_glyph] || GameBalance.emoji_for(0)
     end
   end
 end

@@ -12,7 +12,7 @@ RSpec.describe Rpg::DungeonController do
     response = ctrl.dispatch(:show)
 
     expect(response).to render_text("HP:")
-    expect(response).to render_text("🧙‍♂️")
+    expect(response).to render_text("🧙")
   end
 
   it "moves the player east on l" do
@@ -34,14 +34,10 @@ RSpec.describe Rpg::DungeonController do
     expect(response).to be_quit
   end
 
-  it "starts a new game on n after death" do
-    # We can't force death deterministically with random dungeons, but we can
-    # verify the new_game action resets the world.
-    press_sequence(described_class, ["n"], app: app, screen: screen, route: route)
+  it "navigates to setup on n" do
     response = press(described_class, "n", app: app, screen: screen, route: route)
 
-    expect(response).to render_text("Turn: 0")
-    expect(response).to render_text("Depth: 1")
+    expect(response).to be_navigate
   end
 
   it "enters fire mode on f and fires on a direction key" do

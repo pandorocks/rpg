@@ -48,6 +48,24 @@ RSpec.describe Rpg::DungeonGenerator do
     expect(deep.alive_enemies.size).to be >= shallow.alive_enemies.size
   end
 
+  it "applies easy difficulty modifiers" do
+    easy = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Easy")
+    normal = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Normal")
+
+    expect(easy.player.max_hp).to be > normal.player.max_hp
+    expect(easy.player.damage).to be > normal.player.damage
+    expect(easy.alive_enemies.first.max_hp).to be < normal.alive_enemies.first.max_hp
+  end
+
+  it "applies hard difficulty modifiers" do
+    hard = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Hard")
+    normal = described_class.generate(width: 60, height: 20, depth: 1, seed: 1, difficulty: "Normal")
+
+    expect(hard.player.max_hp).to be < normal.player.max_hp
+    expect(hard.player.damage).to be < normal.player.damage
+    expect(hard.alive_enemies.first.max_hp).to be > normal.alive_enemies.first.max_hp
+  end
+
   def find_stairs(world)
     world.width.times do |x|
       world.height.times do |y|

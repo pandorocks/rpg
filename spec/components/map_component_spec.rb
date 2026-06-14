@@ -28,8 +28,8 @@ RSpec.describe Rpg::MapComponent do
     world = Rpg::World.new_game(seed: 1)
     body = Charming::UI::Width.strip_ansi(component_for(world).render)
 
-    expect(body).to include("#")
-    expect(body).to include(".")
+    expect(body).to include("🧱")
+    expect(body).to include("··")
   end
 
   it "hides unexplored tiles" do
